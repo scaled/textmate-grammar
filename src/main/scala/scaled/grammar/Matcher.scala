@@ -21,7 +21,7 @@ abstract class Matcher {
     * @return `start` if this matcher did not match, or the position at the end of this matcher's
     * match, if it did match.
     */
-  def apply (spans :TreeSet[Span], buf :Buffer, start :Loc) :Loc
+  def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) :Loc
 }
 
 object Matcher {
@@ -31,19 +31,14 @@ object Matcher {
     * @return the location at which matching stopped.
     */
   def applyTo (matchers :List[Matcher], spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc,
-               atEnd :(Buffer, Loc) => Boolean = (_, _) => false) :Loc = {
-    @tailrec @inline def applyFirst (ms :List[Matcher], loc :Loc) :Loc = if (ms.isEmpty) loc else {
-      val nloc = ms.head.apply(spans, buf, loc)
-      if (nloc == loc) applyFirst(ms.tail, loc)
-      else nloc
-    }
+               atEnd :(Buffer, Loc, Loc) => Boolean = (_, _, _) => false) :Loc = {
     var loc = start
-    while (loc < end && !atEnd(buf, loc)) {
+    while (loc < end && !atEnd(buf, loc, end)) {
       // if we're at the end of a line, move to the start of the next line
       // TODO: skip whitespace too?
       if (loc == buf.lineEnd(loc)) loc = buf.forward(loc, 1)
       else {
-        val nloc = applyFirst(matchers, loc)
+        val nloc = applyFirst(matchers, spans, buf, loc, end)
         // if no rules matched, advance to the next character and try again
         if (nloc == loc) loc = buf.forward(loc, 1)
         // otherwise advance to the end of the matched region and continue
@@ -51,6 +46,13 @@ object Matcher {
       }
     }
     loc
+  }
+
+  @tailrec private def applyFirst (ms :List[Matcher], spans :TreeSet[Span], buf :Buffer,
+                                   start :Loc, end :Loc) :Loc = if (ms.isEmpty) start else {
+    val nloc = ms.head.apply(spans, buf, start, end)
+    if (nloc == start) applyFirst(ms.tail, spans, buf, start, end)
+    else nloc
   }
 
   /** Handles matching a pattern and applying a set of captures. */
@@ -62,7 +64,7 @@ object Matcher {
     var matched = false
     @inline private def note (matched :Boolean) = { this.matched = matched ; matched }
 
-    def apply (buf :Buffer, loc :Loc) :Boolean = note {
+    def apply (buf :Buffer, loc :Loc, end :Loc) :Boolean = note {
       if (fullLine && loc.col != 0) false
       else {
         val line = buf.line(loc)
@@ -86,29 +88,34 @@ object Matcher {
     override def toString = m.toString
   }
 
+  class Deferred (group :String, incFn :String => List[Matcher]) extends Matcher {
+    def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) =
+      applyFirst(incFn(group), spans, buf, start, end)
+  }
+
   /** A matcher that matches a regexp in a single line. */
   class Single (pattern :Pattern) extends Matcher {
-    def apply (spans :TreeSet[Span], buf :Buffer, start :Loc) =
-      if (!pattern.apply(buf, start)) start
+    def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) =
+      if (!pattern.apply(buf, start, end)) start
       else pattern.capture(spans, start)
   }
 
   /** A matcher that matches a begin regexp, then applies a set of nested matchers until an end
     * regexp is seen (potentially on a new line). */
-  class Multi (begin :Pattern, end :Pattern, name :Option[String], contentName :Option[String],
+  class Multi (open :Pattern, close :Pattern, name :Option[String], contentName :Option[String],
                contentMatchers :List[Matcher]) extends Matcher {
 
-    private[this] val atEnd = (buf :Buffer, loc :Loc) => end.apply(buf, loc)
+    private[this] val atEnd = (buf :Buffer, start :Loc, end :Loc) => close.apply(buf, start, end)
 
-    override def apply (spans :TreeSet[Span], buf :Buffer, start :Loc) = {
-      if (!begin.apply(buf, start)) start
+    override def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) = {
+      if (!open.apply(buf, start, end)) start
       else {
-        val contentStart = begin.capture(spans, start)
+        val contentStart = open.capture(spans, start)
         val contentEnd = applyTo(contentMatchers, spans, buf, contentStart, buf.end, atEnd)
         contentName.map(nm => spans add new Span(contentStart, contentEnd, nm))
-        if (!end.matched) contentEnd
+        if (!close.matched) contentEnd
         else {
-          val endEnd = end.capture(spans, contentEnd)
+          val endEnd = close.capture(spans, contentEnd)
           name.map(nm => spans add new Span(start, endEnd, nm))
           endEnd
         }

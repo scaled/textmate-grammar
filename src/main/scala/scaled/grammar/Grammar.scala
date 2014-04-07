@@ -4,6 +4,7 @@
 
 package scaled.grammar
 
+import java.io.{File, InputStream}
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, Map => MMap}
 import scaled._
@@ -21,6 +22,10 @@ abstract class Grammar (
 ) {
   val repository :Map[String,Rule]
   val patterns   :List[Rule]
+
+  override def toString = s"Grammar[$name, $scopeName, " +
+    s"fStart=$foldingStartMarker, fStop=$foldingStopMarker, " +
+    s"repo=$repository, pats=$patterns]"
 
   /** A rule which includes a group of rules from the repository. */
   protected def include (group :String) :Rule = new Rule.Include(group)
@@ -54,6 +59,8 @@ abstract class Grammar (
 }
 
 object Grammar {
+  import scala.collection.convert.WrapAsScala._
+  import com.dd.plist._
 
   /** Compiles `grammars` which are a set of inter-related grammars, and returns the matchers from
     * the last grammar in the list. The last grammar is presumed to be the main grammar for the
@@ -65,9 +72,90 @@ object Grammar {
     compilers(grammars.last.scopeName).matchers
   }
 
-  private class Compiler (compilers :String => Compiler, grammar :Grammar) {
+  /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
+  def parse (file :File) :Grammar = toGrammar(PropertyListParser.parse(file))
+
+  /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
+  def parse (in :InputStream) :Grammar = toGrammar(PropertyListParser.parse(in))
+
+  private def toGrammar (root :NSObject) :Grammar = {
+    val rootDict = root.asInstanceOf[NSDictionary]
+    val name = stringFor(rootDict, "name") getOrElse "unknown:name"
+    val scopeName = stringFor(rootDict, "scopeName") getOrElse "unknown:scopeName"
+    val foldStart = stringFor(rootDict, "foldingStartMarker")
+    val foldStop  = stringFor(rootDict, "foldingStopMarker")
+
+    // val fileTypes = rootDict.objectForKey("fileTypes")
+    new Grammar(name, scopeName, foldStart, foldStop) {
+      val repository = Map() ++ dictFor(rootDict, "repository").getHashMap map {
+        case (k, v) => (k -> parseRule(v))
+      }
+      val patterns = parseRules(rootDict)
+    }
+  }
+
+  private def stringFor (dict :NSDictionary, key :String) = dict.objectForKey(key) match {
+    case nsstr :NSString => Some(nsstr.toString)
+    case _ => None
+  }
+  private def dictFor (dict :NSDictionary, key :String) = dict.objectForKey(key) match {
+    case dval :NSDictionary => dval
+    case _ => new NSDictionary()
+  }
+  private def arrayFor (dict :NSDictionary, key :String) = dict.objectForKey(key) match {
+    case aval :NSArray => aval
+    case _ => new NSArray()
+  }
+
+  private def parseCaptures (dict :NSDictionary) = List() ++ dict flatMap {
+    case (group, vdict :NSDictionary) => Some(group.toInt -> stringFor(vdict, "name").get)
+    case _ => None
+  }
+
+  private def parseRules (dict :NSDictionary) :List[Rule] =
+    arrayFor(dict, "patterns").getArray.map(parseRule).toList
+
+  private def parseRule (data :NSObject) :Rule = {
+    val dict = data.asInstanceOf[NSDictionary]
+    val include = stringFor(dict, "include")
+    val name = stringFor(dict, "name")
+    val `match` = stringFor(dict, "match")
+    val begin = stringFor(dict, "begin")
+
+    if (include.isDefined) {
+      new Rule.Include(include.get)
+    } else if (begin.isDefined) {
+      val caps = parseCaptures(dictFor(dict, "captures"))
+      val beginCaps = if (!dict.containsValue("beginCaptures")) caps else
+        parseCaptures(dictFor(dict, "beginCaptures"))
+      val end = stringFor(dict, "end")
+      val endCaps = if (!dict.containsValue("endCaptures")) caps else
+        parseCaptures(dictFor(dict, "endCaptures"))
+      new Rule.Multi(begin.get, beginCaps, end.get, endCaps, name, stringFor(dict, "contentName"),
+                     parseRules(dict))
+    } else if (`match`.isDefined) {
+      new Rule.Single(`match`.get, name, parseCaptures(dictFor(dict, "captures")))
+    } else {
+      new Rule.Container(parseRules(dict))
+    }
+  }
+
+  private class Compiler (compilers :MMap[String,Compiler], grammar :Grammar) {
     val cache = MMap[String, List[Matcher]]()
-    lazy val matchers :List[Matcher] = grammar.patterns.flatMap(
-      _.compile(compilers(_).matchers, grammar.repository, cache))
+    val incFn = (_ :String) match {
+      case "$self" => matchers
+      case group if (group startsWith "#") => cache.get(group substring 1) match {
+        case Some(ms) => ms
+        case None     => println(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
+      }
+      case lang => compilers.get(lang) match {
+        case Some(comp) => comp.matchers
+        case None       => println(s"Unknown include [grammar=${grammar.name}, lang=$lang]") ; Nil
+      }
+    }
+    grammar.repository foreach {
+      case (k, v) => cache put (k, v.compile(incFn))
+    }
+    lazy val matchers :List[Matcher] = grammar.patterns.flatMap(_.compile(incFn))
   }
 }

@@ -4,8 +4,7 @@
 
 package scaled.grammar
 
-import java.io.File
-import java.io.StringReader
+import java.io.{File, StringReader}
 import org.junit.Assert._
 import org.junit._
 import scaled.Loc
@@ -139,5 +138,13 @@ class GrammarTest {
                       "meta.directive.literal.javadoc",
                       "keyword.other.documentation.directive.literal.javadoc"),
                  scoper.scopesAt(Loc(3, 9)))
+  }
+
+  @Test def testParse () {
+    val javaDoc = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
+    val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
+    val grammars = Seq(Grammar.parse(javaDoc), Grammar.parse(java))
+    val matchers = Grammar.compile(grammars)
+    println(matchers)
   }
 }
