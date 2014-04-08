@@ -32,7 +32,7 @@ object Rule {
       extends Rule {
     override def compile (incFn :String => List[Matcher]) = {
       val caps = name.map(n => (0 -> n) :: captures).getOrElse(captures)
-      List(new Matcher.Single(new Matcher.Pattern(pattern, caps)))
+      List(new Matcher.Single(Matcher.pattern(pattern, caps)))
     }
   }
 
@@ -41,8 +41,7 @@ object Rule {
                     name :Option[String], contentName :Option[String],
                     patterns :List[Rule]) extends Rule {
     override def compile (incFn :String => List[Matcher]) = List(
-      new Matcher.Multi(new Matcher.Pattern(begin, beginCaptures),
-                        new Matcher.Pattern(end, endCaptures),
+      new Matcher.Multi(Matcher.pattern(begin, beginCaptures), Matcher.pattern(end, endCaptures),
                         name, contentName, patterns.flatMap(_.compile(incFn))))
   }
 }

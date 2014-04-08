@@ -22,6 +22,11 @@ abstract class Matcher {
     * match, if it did match.
     */
   def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) :Loc
+
+  /** Converts this matcher to a string for debugging purposes. */
+  def toString (expand :Set[String], depth :Int) :String
+
+  protected def nest (depth :Int, msg :String) = ("." * depth) + msg
 }
 
 object Matcher {
@@ -48,6 +53,10 @@ object Matcher {
     loc
   }
 
+  /** Converts `matchers` to a string for debugging purposes. */
+  def toString (matchers :List[Matcher], expand :Set[String], depth :Int = 0) =
+    if (matchers.isEmpty) "" else matchers.map(_.toString(expand, depth)).mkString("\n", "\n", "")
+
   @tailrec private def applyFirst (ms :List[Matcher], spans :TreeSet[Span], buf :Buffer,
                                    start :Loc, end :Loc) :Loc = if (ms.isEmpty) start else {
     val nloc = ms.head.apply(spans, buf, start, end)
@@ -55,9 +64,16 @@ object Matcher {
     else nloc
   }
 
+  def pattern (regexp :String, captures :List[(Int,String)]) :Pattern = try {
+    new Pattern(regexp, JPattern.compile(regexp), captures)
+  } catch {
+    case e :Exception =>
+      println(s"Error compiling '$regexp': ${e.getMessage}")
+      new Pattern("NOMATCH", JPattern.compile("NOMATCH"), captures)
+  }
+
   /** Handles matching a pattern and applying a set of captures. */
-  class Pattern (regexp :String, captures :List[(Int,String)]) {
-    private[this] val p = JPattern.compile(regexp)
+  class Pattern (regexp :String, p :JPattern, captures :List[(Int,String)]) {
     private[this] val m = p.matcher("")
     private[this] val fullLine = regexp startsWith "^"
 
@@ -85,12 +101,15 @@ object Matcher {
       loc.atCol(m.end)
     }
 
-    override def toString = m.toString
+    override def toString = p.toString
   }
 
   class Deferred (group :String, incFn :String => List[Matcher]) extends Matcher {
     def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) =
       applyFirst(incFn(group), spans, buf, start, end)
+
+    def toString (expand :Set[String], depth :Int) =
+      nest(depth, s"Deferred($group)") + Matcher.toString(if (expand(group)) incFn(group) else List(), expand - group, depth+1)
   }
 
   /** A matcher that matches a regexp in a single line. */
@@ -98,6 +117,7 @@ object Matcher {
     def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) =
       if (!pattern.apply(buf, start, end)) start
       else pattern.capture(spans, start)
+    def toString (expand :Set[String], depth :Int) = nest(depth, s"Single($pattern)")
   }
 
   /** A matcher that matches a begin regexp, then applies a set of nested matchers until an end
@@ -121,5 +141,8 @@ object Matcher {
         }
       }
     }
+
+    def toString (expand :Set[String], depth :Int) =
+      nest(depth, s"Multi($open, $close, $name, $contentName)") + Matcher.toString(contentMatchers, expand, depth+1)
   }
 }

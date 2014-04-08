@@ -99,5 +99,11 @@ class Scoper (grammars :Seq[Grammar], buf :RBuffer) {
     }
   }
 
-  override def toString = scopes.map(_.toString("")).mkString
+  override def toString = toString(Set())
+
+  /** Generates a debugging representation of this scoper.
+    * @param expand the names of #include scopes to expand.
+    */
+  def toString (expand :Set[String]) = ("MATCHERS:" + Matcher.toString(matchers, expand) + "\n" +
+    "SCOPES:\n" + scopes.map(_.toString("")).mkString)
 }

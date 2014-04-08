@@ -114,8 +114,9 @@ class GrammarTest {
     /*15*/ "    * A method. How exciting. Let's {@link Test} to something.",
     /*16*/ "    * @throws IllegalArgumentException if we feel like it.",
     /*17*/ "    */",
-    /*18*/ "   public void test (int count) {}",
-    /*19*/ "}").mkString("\n")
+    /*18*/ "   @Deprecated(\"Use peanuts\")",
+    /*19*/ "   public void test (int count) {}",
+    /*20*/ "}").mkString("\n")
 
   def testBuffer (name :String, text :String) =
     BufferImpl(name, new File(name), new StringReader(text))
