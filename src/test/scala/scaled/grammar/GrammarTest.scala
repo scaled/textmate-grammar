@@ -147,6 +147,6 @@ class GrammarTest {
     val grammars = Seq(Grammar.parse(javaDoc), Grammar.parse(java))
     val buffer = testBuffer("Test.java", testJavaCode)
     val scoper = new Scoper(grammars, buffer)
-    println(scoper)
+    // println(scoper)
   }
 }
