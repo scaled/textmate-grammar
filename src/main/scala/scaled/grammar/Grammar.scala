@@ -132,10 +132,10 @@ object Grammar {
       new Rule.Include(include.get)
     } else if (begin.isDefined) {
       val caps = parseCaptures(dictFor(dict, "captures"))
-      val beginCaps = if (!dict.containsValue("beginCaptures")) caps else
+      val beginCaps = if (!dict.containsKey("beginCaptures")) caps else
         parseCaptures(dictFor(dict, "beginCaptures"))
       val end = stringFor(dict, "end")
-      val endCaps = if (!dict.containsValue("endCaptures")) caps else
+      val endCaps = if (!dict.containsKey("endCaptures")) caps else
         parseCaptures(dictFor(dict, "endCaptures"))
       new Rule.Multi(begin.get, beginCaps, end.get, endCaps, name, stringFor(dict, "contentName"),
                      parseRules(dict))
