@@ -101,7 +101,7 @@ object Matcher {
       loc.atCol(m.end)
     }
 
-    override def toString = p.toString
+    override def toString = s"${p.toString}(${captures.map(_._1).mkString})"
   }
 
   class Deferred (group :String, incFn :String => List[Matcher]) extends Matcher {

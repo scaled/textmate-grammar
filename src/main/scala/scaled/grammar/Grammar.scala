@@ -4,7 +4,7 @@
 
 package scaled.grammar
 
-import java.io.{File, InputStream}
+import java.io.{File, InputStream, PrintStream}
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, Map => MMap}
 import scaled._
@@ -23,9 +23,15 @@ abstract class Grammar (
   val repository :Map[String,Rule]
   val patterns   :List[Rule]
 
-  override def toString = s"Grammar[$name, $scopeName, " +
-    s"fStart=$foldingStartMarker, fStop=$foldingStopMarker, " +
-    s"repo=$repository, pats=$patterns]"
+  override def toString =
+    s"Grammar[$name, $scopeName, fStart=$foldingStartMarker, fStop=$foldingStopMarker]"
+
+  /** Prints a debug representation of this grammar to `out`. */
+  def print (out :PrintStream) {
+    out.println(this)
+    repository foreach { case (k, v) => out.println(k) ; v.print(out, 1) }
+    patterns foreach { _.print(out, 0) }
+  }
 
   /** A rule which includes a group of rules from the repository. */
   protected def include (group :String) :Rule = new Rule.Include(group)

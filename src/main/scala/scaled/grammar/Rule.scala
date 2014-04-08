@@ -4,6 +4,7 @@
 
 package scaled.grammar
 
+import java.io.PrintStream
 import scala.collection.mutable.{Map => MMap}
 import scaled._
 
@@ -16,16 +17,26 @@ abstract class Rule {
 
   /** Compiles this rule into a sequence of matchers. */
   def compile (incFn :String => List[Matcher]) :List[Matcher]
+
+  /** Prints a debug representation of this rule. */
+  def print (out :PrintStream, depth :Int) :Unit
+
+  protected def print (out :PrintStream, depth :Int, text :String) {
+    out.print(" " * depth)
+    out.println(text)
+  }
 }
 
 object Rule {
 
   case class Include (group :String) extends Rule {
     override def compile (incFn :String => List[Matcher]) = List(new Matcher.Deferred(group, incFn))
+    override def print (out :PrintStream, depth :Int) = print(out, depth, s"Include($group)")
   }
 
   case class Container (patterns :List[Rule]) extends Rule {
     override def compile (incFn :String => List[Matcher]) = patterns.flatMap(_.compile(incFn))
+    override def print (out :PrintStream, depth :Int) = patterns.foreach(_.print(out, depth+1))
   }
 
   case class Single (pattern :String, name :Option[String], captures :List[(Int,String)])
@@ -34,6 +45,8 @@ object Rule {
       val caps = name.map(n => (0 -> n) :: captures).getOrElse(captures)
       List(new Matcher.Single(Matcher.pattern(pattern, caps)))
     }
+    override def print (out :PrintStream, depth :Int) =
+      print(out, depth, s"Single($pattern, $name, ${fmt(captures)}")
   }
 
   case class Multi (begin :String, beginCaptures :List[(Int,String)],
@@ -43,5 +56,13 @@ object Rule {
     override def compile (incFn :String => List[Matcher]) = List(
       new Matcher.Multi(Matcher.pattern(begin, beginCaptures), Matcher.pattern(end, endCaptures),
                         name, contentName, patterns.flatMap(_.compile(incFn))))
+    override def print (out :PrintStream, depth :Int) {
+      print(out, depth, "Multi(" +
+        s"begin='$begin' ${fmt(beginCaptures)}, end='$end' ${fmt(endCaptures)}, " +
+        s"nm=${name getOrElse "<none>"}, cnm=${contentName getOrElse "<none>"})")
+      patterns.foreach(_.print(out, depth+1))
+    }
   }
+
+  private def fmt (caps :List[(Int,String)]) = caps.map(c => s"${c._1}:${c._2}").mkString(" ")
 }
