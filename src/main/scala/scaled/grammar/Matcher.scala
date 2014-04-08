@@ -74,7 +74,9 @@ object Matcher {
 
   /** Handles matching a pattern and applying a set of captures. */
   class Pattern (regexp :String, p :JPattern, captures :List[(Int,String)]) {
-    private[this] val m = p.matcher("")
+    // we use transparent bounds so that things like word boundary detection works properly even
+    // when we restrict a pattern to a sub-region of a string
+    private[this] val m = p.matcher("").useTransparentBounds(true)
     private[this] val fullLine = regexp startsWith "^"
 
     var matched = false
@@ -92,9 +94,14 @@ object Matcher {
 
     def capture (spans :TreeSet[Span], loc :Loc) :Loc = if (!matched) loc else {
       @tailrec @inline def loop (captures :List[(Int,String)]) :Unit = if (!captures.isEmpty) {
-        val group = captures.head._1 ; val start = m.start(group)
-        if (start >= 0) spans add new Span(
-          loc.atCol(start), loc.atCol(m.end(group)), captures.head._2)
+        val group = captures.head._1 ; val name = captures.head._2
+        try {
+          val start = m.start(group)
+          if (start >= 0) spans add new Span(loc.atCol(start), loc.atCol(m.end(group)), name)
+        } catch {
+          case e :Exception =>
+            println(s"Capture failure [regexp=$regexp, group=$group, name=$name]: ${e.getMessage}")
+        }
         loop(captures.tail)
       }
       loop(captures)
