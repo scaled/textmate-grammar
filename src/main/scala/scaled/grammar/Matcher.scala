@@ -21,10 +21,10 @@ abstract class Matcher {
     * @return `start` if this matcher did not match, or the position at the end of this matcher's
     * match, if it did match.
     */
-  def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) :Loc
+  def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) :Loc
 
   /** Converts this matcher to a string for debugging purposes. */
-  def toString (expand :Set[String], depth :Int) :String
+  def show (expand :Set[String], depth :Int) :String
 
   protected def nest (depth :Int, msg :String) = ("." * depth) + msg
 }
@@ -35,7 +35,7 @@ object Matcher {
     * returns true (whichever happens first).
     * @return the location at which matching stopped.
     */
-  def applyTo (matchers :List[Matcher], spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc,
+  def applyTo (matchers :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc,
                atEnd :(Buffer, Loc, Loc) => Boolean = (_, _, _) => false) :Loc = {
     var loc = start
     while (loc < end && !atEnd(buf, loc, end)) {
@@ -54,10 +54,10 @@ object Matcher {
   }
 
   /** Converts `matchers` to a string for debugging purposes. */
-  def toString (matchers :List[Matcher], expand :Set[String], depth :Int = 0) =
-    if (matchers.isEmpty) "" else matchers.map(_.toString(expand, depth)).mkString("\n", "\n", "")
+  def show (matchers :List[Matcher], expand :Set[String], depth :Int = 0) =
+    if (matchers.isEmpty) "" else matchers.map(_.show(expand, depth)).mkString("\n", "\n", "")
 
-  @tailrec private def applyFirst (ms :List[Matcher], spans :TreeSet[Span], buf :Buffer,
+  @tailrec private def applyFirst (ms :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer,
                                    start :Loc, end :Loc) :Loc = if (ms.isEmpty) start else {
     val nloc = ms.head.apply(spans, buf, start, end)
     if (nloc == start) applyFirst(ms.tail, spans, buf, start, end)
@@ -92,12 +92,12 @@ object Matcher {
       }
     }
 
-    def capture (spans :TreeSet[Span], loc :Loc) :Loc = if (!matched) loc else {
+    def capture (spans :TreeSet[Span.Impl], loc :Loc) :Loc = if (!matched) loc else {
       @tailrec @inline def loop (captures :List[(Int,String)]) :Unit = if (!captures.isEmpty) {
         val group = captures.head._1 ; val name = captures.head._2
         try {
           val start = m.start(group)
-          if (start >= 0) spans add new Span(loc.atCol(start), loc.atCol(m.end(group)), name)
+          if (start >= 0) spans add Span(name, loc.atCol(start), loc.atCol(m.end(group)))
         } catch {
           case e :Exception =>
             println(s"Capture failure [regexp=$regexp, group=$group, name=$name]: ${e.getMessage}")
@@ -112,19 +112,20 @@ object Matcher {
   }
 
   class Deferred (group :String, incFn :String => List[Matcher]) extends Matcher {
-    def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) =
+    def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) =
       applyFirst(incFn(group), spans, buf, start, end)
 
-    def toString (expand :Set[String], depth :Int) =
-      nest(depth, s"Deferred($group)") + Matcher.toString(if (expand(group)) incFn(group) else List(), expand - group, depth+1)
+    def show (expand :Set[String], depth :Int) =
+      nest(depth, s"Deferred($group)") + Matcher.show(
+        if (expand(group)) incFn(group) else List(), expand - group, depth+1)
   }
 
   /** A matcher that matches a regexp in a single line. */
   class Single (pattern :Pattern) extends Matcher {
-    def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) =
+    def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) =
       if (!pattern.apply(buf, start, end)) start
       else pattern.capture(spans, start)
-    def toString (expand :Set[String], depth :Int) = nest(depth, s"Single($pattern)")
+    def show (expand :Set[String], depth :Int) = nest(depth, s"Single($pattern)")
   }
 
   /** A matcher that matches a begin regexp, then applies a set of nested matchers until an end
@@ -134,22 +135,23 @@ object Matcher {
 
     private[this] val atEnd = (buf :Buffer, start :Loc, end :Loc) => close.apply(buf, start, end)
 
-    override def apply (spans :TreeSet[Span], buf :Buffer, start :Loc, end :Loc) = {
+    override def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) = {
       if (!open.apply(buf, start, end)) start
       else {
         val contentStart = open.capture(spans, start)
         val contentEnd = applyTo(contentMatchers, spans, buf, contentStart, buf.end, atEnd)
-        contentName.map(nm => spans add new Span(contentStart, contentEnd, nm))
+        contentName.map(nm => spans add Span(nm, contentStart, contentEnd))
         if (!close.matched) contentEnd
         else {
           val endEnd = close.capture(spans, contentEnd)
-          name.map(nm => spans add new Span(start, endEnd, nm))
+          name.map(nm => spans add Span(nm, start, endEnd))
           endEnd
         }
       }
     }
 
-    def toString (expand :Set[String], depth :Int) =
-      nest(depth, s"Multi($open, $close, $name, $contentName)") + Matcher.toString(contentMatchers, expand, depth+1)
+    def show (expand :Set[String], depth :Int) =
+      nest(depth, s"Multi($open, $close, $name, $contentName)") + Matcher.show(
+        contentMatchers, expand, depth+1)
   }
 }

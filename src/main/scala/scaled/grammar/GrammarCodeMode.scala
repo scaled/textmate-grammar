@@ -41,8 +41,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = new Scoper(grammars, view.buffer)
 
-  // if we're colorizing, apply an initial colorization to the buffer
-  if (!effacers.isEmpty) scoper.apply(new Selector.Processor(effacers))
+  refaceBuffer() // apply an initial colorization to the buffer
 
   override def configDefs = GrammarCodeConfig :: super.configDefs
   override def keymap = super.keymap ++ Seq(
@@ -54,6 +53,11 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   def showSyntax () {
     val ss = scoper.scopesAt(view.point())
     view.popup() = Popup(if (ss.isEmpty) List("No scopes.") else ss, Popup.UpRight(view.point()))
+  }
+
+  @Fn("Refreshes the colorization of the entire buffer.")
+  def refaceBuffer () {
+    if (!effacers.isEmpty) scoper.apply(new Selector.Processor(effacers))
   }
 
 }
