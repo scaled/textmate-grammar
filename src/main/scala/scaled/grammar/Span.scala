@@ -7,10 +7,11 @@ package scaled.grammar
 import scaled.{Loc, Region}
 
 /** Represents a tagged span of text in a buffer. */
-abstract class Span (val name :String) extends Region with Comparable[Span] {
+abstract class Span (val name :Option[String], val matcher :Option[Matcher])
+    extends Region with Comparable[Span] {
 
   /** Returns true if `this` completely encloses `that`. */
-  def encloses (that :Span) = !(that.start < start) && !(that.end > end)
+  def encloses (that :Region) = !(that.start < start) && !(that.end > end)
 
   override def compareTo (that :Span) = {
     val scmp = start.compareTo(that.start)
@@ -18,22 +19,24 @@ abstract class Span (val name :String) extends Region with Comparable[Span] {
     if (scmp != 0) scmp else -end.compareTo(that.end)
   }
 
-  override def toString = s"${Region.toString(start, end)} = $name"
+  override def toString = s"${Region.toString(start, end)} = ${name getOrElse "<>"}"
 }
 
 object Span {
 
-  /** Creates a span with the specified name and bounds. */
-  def apply (name :String, start :Loc, end :Loc) :Impl = {
-    if (start.row == end.row) new Single(name, start, end.col - start.col)
-    else new Multi(name, start, end)
+  /** Creates a span with the specified name and bounds.
+    * @param matcher the matcher to use when rebuilding scopes due to an edit inside this span.
+    */
+  def apply (name :Option[String], matcher :Option[Matcher], start :Loc, end :Loc) :Impl = {
+    if (start.row == end.row) new Single(name, matcher, start, end.col - start.col)
+    else new Multi(name, matcher, start, end)
   }
 
-  private val Zero = new Single("", Loc.Zero, 0) {
+  private val Zero = new Single(None, None, Loc.Zero, 0) {
     override def srow = 0
   }
 
-  abstract class Impl (name :String, _start :Loc) extends Span(name) {
+  abstract class Impl (nm :Option[String], m :Option[Matcher], _start :Loc) extends Span(nm, m) {
 
     private[this] var _parent :Impl = Zero
     private[this] var _srow :Int = _start.row
@@ -65,7 +68,8 @@ object Span {
     protected def shiftRow (rowΔ :Int) :Unit = _srow += rowΔ
   }
 
-  private class Single (name :String, _start :Loc, length :Int) extends Impl(name, _start) {
+  private class Single (nm :Option[String], m :Option[Matcher], _start :Loc, length :Int)
+      extends Impl(nm, m, _start) {
 
     private var _length :Int = length
 
@@ -74,7 +78,7 @@ object Span {
 
     final def expand (srow :Int, end :Loc, rowΔ :Int, colΔ :Int) :Impl = {
       // if we're expanding into a multirow span, return a new Multi
-      if (rowΔ > 0) new Multi(name, this.start, end).setParent(parent)
+      if (rowΔ > 0) new Multi(name, matcher, this.start, end).setParent(parent)
       else {
         _length += colΔ
         this
@@ -86,7 +90,8 @@ object Span {
     }
   }
 
-  private class Multi (name :String, _start :Loc, _end :Loc) extends Impl(name, _start) {
+  private class Multi (nm :Option[String], m :Option[Matcher], _start :Loc, _end :Loc)
+      extends Impl(nm, m, _start) {
 
     private[this] var _rows :Int = _end.row-_start.row
     private[this] var _ecol :Int = _end.col
@@ -103,7 +108,7 @@ object Span {
       val nrows = _rows - (tend.row - tstart.row)
       val necol = _ecol - (if (tend.row == erow) (tend.col - tstart.col) else 0)
       // if we shrunk down to a single line span, return a new Single
-      if (nrows == 0) new Single(name, start, necol-scol).setParent(parent)
+      if (nrows == 0) new Single(name, matcher, start, necol-scol).setParent(parent)
       else {
         _rows = nrows
         _ecol = necol

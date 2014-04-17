@@ -31,12 +31,24 @@ abstract class Matcher {
 
 object Matcher {
 
-  /** Applies `matchers` to `buf` starting at `start` and stopping when `end` is reached or `atEnd`
-    * returns true (whichever happens first).
-    * @return the location at which matching stopped.
-    */
-  def applyTo (matchers :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc,
-               atEnd :(Buffer, Loc, Loc) => Boolean = (_, _, _) => false) :Loc = {
+  /** Returns a top-level matcher which uses the supplied list of grammar matchers. */
+  def top (matchers :List[Matcher]) = new Matcher {
+    def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) =
+      applyTo(matchers, spans, buf, start, end)
+    def show (expand :Set[String], depth :Int) = showAt(matchers, expand, depth)
+  }
+
+  /** Returns a pattern that matches `regexp` and names groups per `captures`. */
+  def pattern (regexp :String, captures :List[(Int,String)]) :Pattern = try {
+    new Pattern(regexp, JPattern.compile(regexp), captures)
+  } catch {
+    case e :Exception =>
+      println(s"Error compiling '$regexp': ${e.getMessage}")
+      new Pattern("NOMATCH", JPattern.compile("NOMATCH"), captures)
+  }
+
+  private def applyTo (matchers :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer, start :Loc,
+                       end :Loc, atEnd :(Buffer, Loc, Loc) => Boolean = (_, _, _) => false) :Loc = {
     var loc = start
     while (loc < end && !atEnd(buf, loc, end)) {
       // if we're at the end of a line, move to the start of the next line
@@ -53,10 +65,6 @@ object Matcher {
     loc
   }
 
-  /** Converts `matchers` to a string for debugging purposes. */
-  def show (matchers :List[Matcher], expand :Set[String], depth :Int = 0) =
-    if (matchers.isEmpty) "" else matchers.map(_.show(expand, depth)).mkString("\n", "\n", "")
-
   @tailrec private def applyFirst (ms :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer,
                                    start :Loc, end :Loc) :Loc = if (ms.isEmpty) start else {
     val nloc = ms.head.apply(spans, buf, start, end)
@@ -64,13 +72,8 @@ object Matcher {
     else nloc
   }
 
-  def pattern (regexp :String, captures :List[(Int,String)]) :Pattern = try {
-    new Pattern(regexp, JPattern.compile(regexp), captures)
-  } catch {
-    case e :Exception =>
-      println(s"Error compiling '$regexp': ${e.getMessage}")
-      new Pattern("NOMATCH", JPattern.compile("NOMATCH"), captures)
-  }
+  private def showAt (matchers :List[Matcher], expand :Set[String], depth :Int) =
+    if (matchers.isEmpty) "" else matchers.map(_.show(expand, depth)).mkString("\n", "\n", "")
 
   /** Handles matching a pattern and applying a set of captures. */
   class Pattern (regexp :String, p :JPattern, captures :List[(Int,String)]) {
@@ -97,7 +100,7 @@ object Matcher {
         val group = captures.head._1 ; val name = captures.head._2
         try {
           val start = m.start(group)
-          if (start >= 0) spans add Span(name, loc.atCol(start), loc.atCol(m.end(group)))
+          if (start >= 0) spans add Span(Some(name), None, loc.atCol(start), loc.atCol(m.end(group)))
         } catch {
           case e :Exception =>
             println(s"Capture failure [regexp=$regexp, group=$group, name=$name]: ${e.getMessage}")
@@ -116,7 +119,7 @@ object Matcher {
       applyFirst(incFn(group), spans, buf, start, end)
 
     def show (expand :Set[String], depth :Int) =
-      nest(depth, s"Deferred($group)") + Matcher.show(
+      nest(depth, s"Deferred($group)") + showAt(
         if (expand(group)) incFn(group) else List(), expand - group, depth+1)
   }
 
@@ -139,19 +142,21 @@ object Matcher {
       if (!open.apply(buf, start, end)) start
       else {
         val contentStart = open.capture(spans, start)
-        val contentEnd = applyTo(contentMatchers, spans, buf, contentStart, buf.end, atEnd)
-        contentName.map(nm => spans add Span(nm, contentStart, contentEnd))
+        val contentEnd = applyTo(contentMatchers, spans, buf, contentStart, end, atEnd)
+        // we always add a content span, whether we have a name or not, with a special matcher that
+        // can reprocess just the content of this match
+        spans add Span(contentName, Some(top(contentMatchers)), contentStart, contentEnd)
         if (!close.matched) contentEnd
         else {
           val endEnd = close.capture(spans, contentEnd)
-          name.map(nm => spans add Span(nm, start, endEnd))
+          name.map(nm => spans add Span(Some(nm), None, start, endEnd))
           endEnd
         }
       }
     }
 
     def show (expand :Set[String], depth :Int) =
-      nest(depth, s"Multi($open, $close, $name, $contentName)") + Matcher.show(
+      nest(depth, s"Multi($open, $close, $name, $contentName)") + showAt(
         contentMatchers, expand, depth+1)
   }
 }

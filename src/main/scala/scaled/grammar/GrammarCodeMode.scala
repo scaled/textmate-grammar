@@ -39,9 +39,10 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   protected def effacers :List[Effacer] = Nil
 
   /** Handles applying the grammars to the buffer and computing scopes. */
-  val scoper = new Scoper(grammars, view.buffer)
-
-  refaceBuffer() // apply an initial colorization to the buffer
+  val scoper = {
+    val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers))
+    new Scoper(grammars, view.buffer, syntax, procs)
+  }
 
   override def configDefs = GrammarCodeConfig :: super.configDefs
   override def keymap = super.keymap ++ Seq(
@@ -57,7 +58,6 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
 
   @Fn("Refreshes the colorization of the entire buffer.")
   def refaceBuffer () {
-    if (!effacers.isEmpty) scoper.apply(new Selector.Processor(effacers))
+    scoper.applyProcs()
   }
-
 }

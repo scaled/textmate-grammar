@@ -7,6 +7,7 @@ package scaled.grammar
 import java.util.TreeSet
 import scala.annotation.tailrec
 import scaled._
+import scaled.major.{Syntax, SyntaxTable}
 
 /** Applies a set of grammars to an [[RBuffer]] to obtain an initial naming of all text in the
   * buffer. Then also listens for modifications to the buffer and updates the namings to
@@ -14,48 +15,78 @@ import scaled._
   *
   * The last grammar in the list is considered to be the main grammar, the other grammars are
   * presumed to be referenced by the main grammar as sub-languages.
+  *
+  * @param procs a list of processors that will be applied first to the whole buffer, then to any
+  * parts of the buffer that are rescoped due to the buffer being edited.
   */
-class Scoper (grammars :Seq[Grammar], buf :RBuffer) {
+class Scoper (grammars :Seq[Grammar], buf :RBuffer, syntax :SyntaxTable,
+              procs :List[Selector.Processor]) {
   import scala.collection.convert.WrapAsScala._
 
   /** Returns the scope names applied to `loc` in outer- to inner-most order. */
   def scopesAt (loc :Loc) :List[String] = topScope.scopesAt(loc)
 
-  /** Applies `proc` to our buffer, matching its selectors against our assigned scope names. */
-  def apply (proc :Selector.Processor) :Unit = topScope.apply(proc, Nil)
-
   /** Generates a debugging representation of this scoper's matchers.
     * @param expand the names of #include scopes to expand. */
-  def showMatchers (expand :Set[String]) :String = Matcher.show(matchers, expand)
+  def showMatchers (expand :Set[String]) :String = topMatcher.show(expand, 0)
 
   /** Generates a debugging representation of this scoper's scope assignments. */
   def showScopes :String = topScope.show("")
 
+  /** Applies the registered processors to the entire buffer. */
+  def applyProcs () :Unit = procs foreach topScope.apply(Nil)
+
   override def toString = s"Scoper($grammars, $buf)"
 
-  private val matchers :List[Matcher] = Grammar.compile(grammars)
+  private val topMatcher :Matcher = Matcher.top(Grammar.compile(grammars))
   private val topScope :Scope = {
-    val spans = new TreeSet[Span.Impl]()
-    val top = Span(grammars.last.scopeName, buf.start, buf.end)
+    val top = Span(Some(grammars.last.scopeName), Some(topMatcher), buf.start, buf.end)
     // accumulate all spans in the document into our ordered tree set
-    Matcher.applyTo(matchers, spans, buf, top.start, top.end)
+    val spans = new TreeSet[Span.Impl]()
+    topMatcher.apply(spans, buf, top.start, top.end)
     // now turn those scopes into a big tree; see consume scopes for details
     new Scope(top, new Peekerator(spans.iterator))
   }
 
+  // apply all of our processors to the top scope to get things started
+  applyProcs()
+
   // listen for changes to the buffer and keep things up to date
   buf.edited.onValue { _ match {
-    case    Buffer.Insert(start, end   ) => topScope.onInsert(start, end)
+    case    Buffer.Insert(start, end   ) => topScope.onInsert(start, end) ; accumInsert(start, end)
     case    Buffer.Delete(start, end, _) => topScope.onDelete(start, end)
     case Buffer.Transform(start, end, _) => // TODO
   }}
+
+  private val isNotWord = syntax.isNot(Syntax.Word)
+  private val isNotWhitespace = syntax.isNot(Syntax.Whitespace)
+
+  private def accumInsert (start :Loc, end :Loc) {
+    // if this new insertion is not all word characters, or it does not immediately follow the
+    // current accumulating insertion, flush the accumulating insertion
+    val isAllWord = (buf.findForward(start, end, isNotWord) == end)
+    if (!isAllWord || start != _accumInsert.end) flushInsert()
+    // if we flushed, accum is empty so we'll start a new accumulating insertion
+    if (_accumInsert.isEmpty) _accumInsert = Region(start, end)
+    // otherwise expand our accumulating insertion to include this one
+    else _accumInsert = Region(_accumInsert.start, end)
+  }
+  private def flushInsert () {
+    val ai = _accumInsert ; if (!ai.isEmpty) {
+      // ignore inserts that are all whitespace
+      if (buf.findForward(ai.start, ai.end, isNotWhitespace) != ai.end)
+        topScope.container(ai).rethink(ai)
+      _accumInsert = Region.Empty
+    }
+  }
+  private var _accumInsert = Region.Empty
 
   // allows to peek at the first span in `iter` without consuming it
   private class Peekerator (iter :Iterator[Span.Impl]) {
     private[this] var cur :Span.Impl = _
     def hasNext :Boolean = iter.hasNext
     def peek :Span.Impl = { if (cur == null) cur = iter.next() ; cur }
-    def take () :Span.Impl = { val had = peek ; cur = iter.next() ; had }
+    def take () :Span.Impl = { val had = peek ; cur = if (iter.hasNext) iter.next() else null ; had }
   }
 
   // consumes all the scopes that are completely enclosed by `encl` and returns them as a list; on
@@ -82,13 +113,55 @@ class Scoper (grammars :Seq[Grammar], buf :RBuffer) {
       s"${indent}$span\n${scopes.map(_.show(nindent)).mkString}"
     }
 
-    def scopesAt (loc :Loc) :List[String] = span.name :: findScopesAt(scopes, loc)
+    def scopesAt (loc :Loc) :List[String] = {
+      val rest = findScopesAt(scopes, loc)
+      if (span.name.isDefined) span.name.get :: rest else rest
+    }
 
-    def apply (proc :Selector.Processor, path :List[String]) {
-      val spath = path :+ span.name
+    /** Returns the scope that fully contains `region`. `this` must already contain `region`, thus we
+      * return either a child that fully contains `region` or `this`. */
+    def container (region :Region) :Scope = {
+      @tailrec @inline def loop (ii :Int) :Scope = if (ii == scopes.length) this else {
+        val s = scopes(ii)
+        if (s.span.encloses(region)) s.container(region)
+        else loop(ii+1)
+      }
+      loop(0)
+    }
+
+    def apply (path :List[String])(proc :Selector.Processor) {
+      val spath = path ++ span.name.toList
       proc.apply(spath, buf, span)
-      val ss = scopes ; var ii = 0; while (ii < ss.length) { ss(ii).apply(proc, spath) ; ii += 1 }
-      // scopes foreach(_.apply(proc, spath))
+      val ss = scopes ; var ii = 0; while (ii < ss.length) { ss(ii).apply(spath)(proc) ; ii += 1 }
+    }
+
+    def rethink (region :Region) :Unit = span.matcher match {
+      case Some(m) =>
+        println(s"Rethink $region in $span")
+        println(buf.region(region))
+        val startShow = show("").split("\n").toList
+        val spans = new TreeSet[Span.Impl]()
+        // rethink from the start of this span to the end of the inserted region
+        m.apply(spans, buf, span.start, region.end)
+        scopes = consumeScopes(span, new Peekerator(spans.iterator)).toArray ++
+          scopes.dropWhile(_.span.start < region.end)
+        val endShow = show("").split("\n").toList
+        diff(startShow, endShow)
+        // apply our processors to this rethunk scope
+        procs foreach apply(Nil)
+      case None =>
+        println(s"Can't rethink matcher-less span: $span")
+    }
+
+    private def diff (a :List[String], b :List[String]) {
+      if (a.isEmpty && b.isEmpty) {} // done
+      else if (a.isEmpty)  { println(s"+${b.head}") ; diff(a, b.tail) }
+      else if (b.isEmpty)  { println(s"-${a.head}") ; diff(a.tail, b) }
+      else (a.head compareTo b.head) match {
+        case 0            =>                          diff(a.tail, b.tail)
+        case r if (r < 0) => println(s"-${a.head}") ; diff(a.tail, b)
+        case r            => println(s"+${b.head}") ; diff(a, b.tail)
+      }
     }
 
     def onInsert (start :Loc, end :Loc) {
@@ -100,6 +173,8 @@ class Scoper (grammars :Seq[Grammar], buf :RBuffer) {
       val erow = end.row
       procDelete(start, end, erow, start.row-erow, start.col-end.col)
     }
+
+    override def toString = span.toString
 
     private def shift (pos :Loc, prow :Int, rowΔ :Int, colΔ :Int) :Boolean = {
       val prowΔ = prow - span.srow

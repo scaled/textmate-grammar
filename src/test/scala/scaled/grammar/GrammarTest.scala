@@ -10,8 +10,11 @@ import org.junit._
 import scala.collection.mutable.ArrayBuffer
 import scaled._
 import scaled.impl.BufferImpl
+import scaled.major.SyntaxTable
 
 class GrammarTest {
+
+  val syntax = new SyntaxTable()
 
   val JdBegin = "punctuation.definition.directive.begin.javadoc"
   val JdEnd   = "punctuation.definition.directive.end.javadoc"
@@ -144,13 +147,13 @@ class GrammarTest {
     val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
     val grammars = Seq(Grammar.parse(javaDoc), Grammar.parse(java))
     val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(grammars, buffer)
+    val scoper = new Scoper(grammars, buffer, syntax, Nil)
     // println(scoper)
   }
 
   @Test def testJavaDocMatch () {
     val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(Seq(javaDoc), buffer)
+    val scoper = new Scoper(Seq(javaDoc), buffer, syntax, Nil)
     // println(scoper.showScopes)
     assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertEquals(literalAt, scoper.scopesAt(Loc(3, 8)))
@@ -181,7 +184,7 @@ class GrammarTest {
 
   def smallTestBits (showScopes :Boolean) = {
     val buffer = testBuffer("Test.java", smallTestCode)
-    val scoper = new Scoper(Seq(javaDoc), buffer)
+    val scoper = new Scoper(Seq(javaDoc), buffer, syntax, Nil)
     if (showScopes) println(scoper.showScopes)
     // do some precondition tests
     assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
