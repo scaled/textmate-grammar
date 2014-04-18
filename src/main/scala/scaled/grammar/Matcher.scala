@@ -16,6 +16,7 @@ import scaled._
   */
 case class Span (scopes :List[String], start :Int, end :Int) {
   def contains (pos :Int) = start <= pos && pos < end
+  override def toString = s"$start-$end " + scopes.mkString(" ")
 }
 
 /** Matches some number of grammar rules against a particular line. */
@@ -62,22 +63,27 @@ object Matcher {
     //
     // implementation details
 
-    var lastPos = 0
+    private[this] var lastPos = 0
 
     def pushScope (pos :Int, scope :String) :Unit = {
       // println(s"Push $pos $scope")
-      if (pos > lastPos) spans += Span(scopes, lastPos, pos)
+      if (pos > lastPos) {
+        spans += Span(scopes, lastPos, pos)
+        lastPos = pos
+      }
       scopes = scope :: scopes
-      lastPos = pos
     }
     def pushScope (pos :Int, scope :Option[String]) :Unit =
       if (scope.isDefined) pushScope(pos, scope.get)
+
     def popScope (pos :Int, scope :String) :Unit = {
       // println(s"Pop $pos $scope")
-      if (pos > lastPos) spans += Span(scopes, lastPos, pos)
+      if (pos > lastPos) {
+        spans += Span(scopes, lastPos, pos)
+        lastPos = pos
+      }
       if (scopes.head != scope) new IllegalStateException(s"Wanted to pop $scope, have $scopes")
       scopes = scopes.tail
-      lastPos = pos
     }
     def popScope (pos :Int, scope :Option[String]) :Unit =
       if (scope.isDefined) popScope(pos, scope.get)
