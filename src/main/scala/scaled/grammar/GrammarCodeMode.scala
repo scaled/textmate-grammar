@@ -10,14 +10,14 @@ import scaled.major.CodeMode
 object GrammarCodeConfig extends Config.Defs {
 
   /** An alias for a (`Selector`, style fn) pair. */
-  type Effacer = (Selector, (Buffer,Span) => Unit)
+  type Effacer = (Selector, (Buffer,Loc,Loc) => Unit)
 
   /** Compiles `selector` into a TextMate grammar selector and pairs it with a function that applies
     * `cssClass` to buffer spans matched by the selector. */
   def effacer (selector :String, cssClass :String) :Effacer =
-    (Selector.parse(selector), (buf :Buffer, span :Span) => {
+    (Selector.parse(selector), (buf :Buffer, start :Loc, end :Loc) => {
       // println(s"Applying $cssClass to $span")
-      buf.updateStyles(_ - codeP + cssClass, span)
+      buf.updateStyles(_ - codeP + cssClass, start, end)
     })
 
   /** A predicate we use to strip `code` styles from a line before restyling it. */
@@ -41,7 +41,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
     val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers))
-    new Scoper(grammars, view.buffer, syntax, procs)
+    new Scoper(grammars, view.buffer, procs)
   }
 
   override def configDefs = GrammarCodeConfig :: super.configDefs

@@ -10,11 +10,8 @@ import org.junit._
 import scala.collection.mutable.ArrayBuffer
 import scaled._
 import scaled.impl.BufferImpl
-import scaled.major.SyntaxTable
 
 class GrammarTest {
-
-  val syntax = new SyntaxTable()
 
   val JdBegin = "punctuation.definition.directive.begin.javadoc"
   val JdEnd   = "punctuation.definition.directive.end.javadoc"
@@ -97,20 +94,31 @@ class GrammarTest {
             single("""\*\s*((\@)\S+)\s""", captures = List(1 -> KeyDoc("custom"), 2 -> JdKey)))))
   }
 
+  def testBuffer (name :String, text :String) =
+    BufferImpl(name, new File(name), new StringReader(text))
+
+  def assertScopesEqual (want :List[String], got :List[String]) :Unit = {
+    if (want != got) {
+      val fmt = s"%${want.map(_.length).max}s | %s"
+      fail("Scope mismatch (want | got):\n" +
+        want.zipAll(got, "", "").map(t => fmt.format(t._1, t._2)).mkString("\n"))
+    }
+  }
+
   val testJavaCode = Seq(
     //                1         2         3         4         5         6         7         8
     //      012345678901234567890123456789012345678901234567890123456789012345678901234567890123456
     /* 0*/ "package foo;",
     /* 1*/ "",
-    /* 2*/ "/** This is some test Java code that we'll use to test {@code Grammar} and specifically",
-    /* 3*/ " * the {@literal JavaDoc} grammar.",
-    /* 4*/ " * @see http://manual.macromates.com/en/language_grammars",
-    /* 5*/ " */",
-    /* 6*/ "public class Test {",
-    /* 7*/ "   /**",
-    /* 8*/ "    * A constructor, woo!",
-    /* 8*/ "    * @param foo for fooing.",
-    /*10*/ "    * @param bar for barring.",
+    /* 2*/ "/**",
+    /* 3*/ " * This is some test Java code that we'll use to test {@code Grammar} and specifically",
+    /* 4*/ " * the {@literal JavaDoc} grammar.",
+    /* 5*/ " * @see http://manual.macromates.com/en/language_grammars",
+    /* 6*/ " */",
+    /* 7*/ "public class Test {",
+    /* 8*/ "   /**",
+    /* 9*/ "    * A constructor, woo!",
+    /*10*/ "    * @param foo for fooing.",
     /*11*/ "    */",
     /*12*/ "   public Test () {}",
     /*13*/ "",
@@ -139,25 +147,12 @@ class GrammarTest {
                           "meta.directive.literal.javadoc",
                           "keyword.other.documentation.directive.literal.javadoc")
 
-  def testBuffer (name :String, text :String) =
-    BufferImpl(name, new File(name), new StringReader(text))
-
-  @Test def testParse () {
-    val javaDoc = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
-    val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
-    val grammars = Seq(Grammar.parse(javaDoc), Grammar.parse(java))
-    val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(grammars, buffer, syntax, Nil)
-    // println(scoper)
-  }
-
   @Test def testJavaDocMatch () {
     val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(Seq(javaDoc), buffer, syntax, Nil)
-    // println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(3, 8)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(3, 9)))
+    val scoper = new Scoper(Seq(javaDoc), buffer, Nil)
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 8)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 9)))
   }
 
   val smallTestCode = Seq(
@@ -170,86 +165,74 @@ class GrammarTest {
     /* 4*/ " * @see http://manual.macromates.com/en/language_grammars",
     /* 5*/ " */").mkString("\n")
 
-  // grinds through buffer generating a 2D array of the scopes at every position
-  def mapScopes (buffer :Buffer, scoper :Scoper) :Seq[Seq[List[String]]] = {
-    val map = ArrayBuffer[ArrayBuffer[List[String]]]()
-    var pos = buffer.start ; val end = buffer.end
-    while (pos < end) {
-      if (map.length <= pos.row) map += ArrayBuffer[List[String]]()
-      map(pos.row) += scoper.scopesAt(pos)
-      pos = buffer.forward(pos, 1)
-    }
-    map
-  }
-
-  def smallTestBits (showScopes :Boolean) = {
+  def smallTestBits () = {
     val buffer = testBuffer("Test.java", smallTestCode)
-    val scoper = new Scoper(Seq(javaDoc), buffer, syntax, Nil)
-    if (showScopes) println(scoper.showScopes)
+    val scoper = new Scoper(Seq(javaDoc), buffer, Nil)
     // do some precondition tests
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(3, 14)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(3, 15)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 14)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 15)))
     (buffer, scoper)
   }
 
   @Test def testWordInsert () {
-    val (buffer, scoper) = smallTestBits(false)
+    val (buffer, scoper) = smallTestBits()
     buffer.insert(Loc(3, 8), "blah ", Styles.None)
-    // println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(3, 19)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(3, 20)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 19)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 20)))
   }
 
   @Test def testNewlineInsert () {
-    val (buffer, scoper) = smallTestBits(false)
+    val (buffer, scoper) = smallTestBits()
     buffer.insert(Loc(3, 0), Seq(new Line(""), new Line("")))
-    // println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(4, 14)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(4, 15)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 14)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 15)))
   }
 
   @Test def testRaggedInsert () {
-    val (buffer, scoper) = smallTestBits(false)
+    val (buffer, scoper) = smallTestBits()
     buffer.insert(Loc(3, 0), Seq(new Line(" "), new Line(" ")))
-    // println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(4, 15)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(4, 16)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 15)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 16)))
   }
 
   @Test def testWordDelete () {
-    val (buffer, scoper) = smallTestBits(false)
+    val (buffer, scoper) = smallTestBits()
     buffer.delete(Loc(3, 8), 5)
-    // println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(3, 9)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(3, 10)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 9)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 10)))
   }
 
   @Test def testNewlineDelete () {
-    val (buffer, scoper) = smallTestBits(false)
+    val (buffer, scoper) = smallTestBits()
     buffer.delete(Loc(1, 0), Loc(2, 0))
-    // println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(1, 0)))
-    assertEquals(literalAt, scoper.scopesAt(Loc(2, 14)))
-    assertEquals(literalToken, scoper.scopesAt(Loc(2, 15)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(1, 0)))
+    assertScopesEqual(literalAt, scoper.scopesAt(Loc(2, 14)))
+    assertScopesEqual(literalToken, scoper.scopesAt(Loc(2, 15)))
   }
 
   @Test def testEnclosingDelete () {
-    val (buffer, scoper) = smallTestBits(true)
+    val (buffer, scoper) = smallTestBits()
     buffer.delete(Loc(3, 13), Loc(3, 32))
-    println(scoper.showScopes)
-    assertEquals(commentStart, scoper.scopesAt(Loc(2, 0)))
+    assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     val scopes = List("text.html.javadoc",
                       "comment.block.documentation.javadoc",
                       "meta.documentation.comment.javadoc",
                       "text.html")
-    assertEquals(scopes, scoper.scopesAt(Loc(3, 14)))
-    assertEquals(scopes, scoper.scopesAt(Loc(3, 15)))
+    assertScopesEqual(scopes, scoper.scopesAt(Loc(3, 14)))
+    assertScopesEqual(scopes, scoper.scopesAt(Loc(3, 15)))
   }
 
-  // TODO: other deletion tests, but things seem to work properly now and I'm too lazy
+  @Test def testParse () {
+    val javaDoc = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
+    val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
+    val grammars = Seq(Grammar.parse(javaDoc), Grammar.parse(java))
+    val buffer = testBuffer("Test.java", testJavaCode)
+    val scoper = new Scoper(grammars, buffer, Nil)
+    // println(scoper)
+  }
 }

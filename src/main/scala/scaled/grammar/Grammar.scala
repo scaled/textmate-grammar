@@ -68,14 +68,15 @@ object Grammar {
   import scala.collection.convert.WrapAsScala._
   import com.dd.plist._
 
-  /** Compiles `grammars` which are a set of inter-related grammars, and returns the matchers from
-    * the last grammar in the list. The last grammar is presumed to be the main grammar for the
-    * mode and the other grammars are for languages which can be nested in the main grammar.
+  /** Compiles `grammars` which are a set of inter-related grammars, and returns a matcher that can
+    * be used to apply the grammars to a buffer. The last grammar is presumed to be the main
+    * grammar for the mode and the other grammars are for languages which can be nested in the main
+    * grammar.
     */
-  def compile (grammars :Seq[Grammar]) :List[Matcher] = {
+  def compile (grammars :Seq[Grammar]) :Matcher = {
     val compilers = MMap[String,Compiler]()
     grammars foreach { g => compilers += (g.scopeName -> new Compiler(compilers, g)) }
-    compilers(grammars.last.scopeName).matchers
+    Matcher.first(compilers(grammars.last.scopeName).matchers)
   }
 
   /** Parses a `tmLanguage` grammar file which should be in plist XML format. */

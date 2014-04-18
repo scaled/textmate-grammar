@@ -4,24 +4,26 @@
 
 package scaled.grammar
 
-import java.util.TreeSet
 import java.util.regex.{Pattern => JPattern, Matcher => JMatcher}
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scaled._
 
-/** A matcher is created from a grammar rule. The grammar rules are compiled into a tree of
-  * matchers which efficiently apply those rules to a buffer, tagging characters with styles.
+/** Represents a matched span of text on a line.
+  * @param scopes the list of scopes applicable to this span of text (innermost to outermost).
+  * @param start the offset in the line at which the span starts.
+  * @param end the offset in the line at which the span ends.
   */
+case class Span (scopes :List[String], start :Int, end :Int) {
+  def contains (pos :Int) = start <= pos && pos < end
+}
+
+/** Matches some number of grammar rules against a particular line. */
 abstract class Matcher {
 
-  /** Applies this matcher to `buf` starting at `start`.
-    * @param spans a buffer to which named spans are added.
-    * @param buf the buffer to which we're applying this matcher.
-    * @param start the location in the buffer at which we're seeking a match.
-    * @return `start` if this matcher did not match, or the position at the end of this matcher's
-    * match, if it did match.
-    */
-  def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) :Loc
+  /** Applies this matcher to the supplied `line` at `start`. Matched spans are added to `spans`.
+    * @return `start` if no matches were made, the offset following the last match otherwise. */
+  def apply (state :Matcher.State, line :LineV, start :Int) :Int
 
   /** Converts this matcher to a string for debugging purposes. */
   def show (expand :Set[String], depth :Int) :String
@@ -31,49 +33,71 @@ abstract class Matcher {
 
 object Matcher {
 
-  /** Returns a top-level matcher which uses the supplied list of grammar matchers. */
-  def top (matchers :List[Matcher]) = new Matcher {
-    def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) =
-      applyTo(matchers, spans, buf, start, end)
-    def show (expand :Set[String], depth :Int) = showAt(matchers, expand, depth)
-  }
+  /** Used to match a single line and retain the matcher state at the end of the line.
+    * @param matchers the current stack of active matchers.
+    * @param scopes the current stack of active scopes. */
+  class State (var matchers :List[Matcher], var scopes :List[String]) extends Cloneable {
 
-  /** Returns a pattern that matches `regexp` and names groups per `captures`. */
-  def pattern (regexp :String, captures :List[(Int,String)]) :Pattern = try {
-    new Pattern(regexp, JPattern.compile(regexp), captures)
-  } catch {
-    case e :Exception =>
-      println(s"Error compiling '$regexp': ${e.getMessage}")
-      new Pattern("NOMATCH", JPattern.compile("NOMATCH"), captures)
-  }
+    /** The spans matched on this line. */
+    val spans = ArrayBuffer[Span]()
 
-  private def applyTo (matchers :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer, start :Loc,
-                       end :Loc, atEnd :(Buffer, Loc, Loc) => Boolean = (_, _, _) => false) :Loc = {
-    var loc = start
-    while (loc < end && !atEnd(buf, loc, end)) {
-      // if we're at the end of a line, move to the start of the next line
-      // TODO: skip whitespace too?
-      if (loc == buf.lineEnd(loc)) loc = buf.forward(loc, 1)
-      else {
-        val nloc = applyFirst(matchers, spans, buf, loc, end)
-        // if no rules matched, advance to the next character and try again
-        if (nloc == loc) loc = buf.forward(loc, 1)
-        // otherwise advance to the end of the matched region and continue
-        else loc = nloc
-      }
+    /** Continues matching with `line` (which should be the line immediately following ours). This
+      * state serves as the starting point and a new state is returned which represents the state
+      * of the matcher at the end of `line`. */
+    def continue (line :LineV) :State = new State(matchers, scopes).process(line)
+
+    /** Applies `procs` to the spans matched on this line. */
+    @tailrec final def apply (procs :List[Selector.Processor], buf :Buffer, row :Int) {
+      @inline @tailrec def loop (proc :Selector.Processor, ii :Int) :Unit =
+        if (ii < spans.length) { proc.apply(buf, row, spans(ii)) ; loop(proc, ii+1) }
+      if (!procs.isEmpty) { loop(procs.head, 0) ; apply(procs.tail, buf, row) }
     }
-    loc
-  }
 
-  @tailrec private def applyFirst (ms :List[Matcher], spans :TreeSet[Span.Impl], buf :Buffer,
-                                   start :Loc, end :Loc) :Loc = if (ms.isEmpty) start else {
-    val nloc = ms.head.apply(spans, buf, start, end)
-    if (nloc == start) applyFirst(ms.tail, spans, buf, start, end)
-    else nloc
-  }
+    /** Returns the scopes at `pos` on this line. */
+    def scopesAt (pos :Int) :List[String] = spans.find(_.contains(pos)).map(_.scopes) getOrElse Nil
 
-  private def showAt (matchers :List[Matcher], expand :Set[String], depth :Int) =
-    if (matchers.isEmpty) "" else matchers.map(_.show(expand, depth)).mkString("\n", "\n", "")
+    /** Genertes a debug representation of our scopes. */
+    def showScopes :String = spans.mkString(" ")
+
+    //
+    // implementation details
+
+    var lastPos = 0
+
+    def pushScope (pos :Int, scope :String) :Unit = {
+      // println(s"Push $pos $scope")
+      if (pos > lastPos) spans += Span(scopes, lastPos, pos)
+      scopes = scope :: scopes
+      lastPos = pos
+    }
+    def pushScope (pos :Int, scope :Option[String]) :Unit =
+      if (scope.isDefined) pushScope(pos, scope.get)
+    def popScope (pos :Int, scope :String) :Unit = {
+      // println(s"Pop $pos $scope")
+      if (pos > lastPos) spans += Span(scopes, lastPos, pos)
+      if (scopes.head != scope) new IllegalStateException(s"Wanted to pop $scope, have $scopes")
+      scopes = scopes.tail
+      lastPos = pos
+    }
+    def popScope (pos :Int, scope :Option[String]) :Unit =
+      if (scope.isDefined) popScope(pos, scope.get)
+
+    private def process (line :LineV) :State = {
+      // println("Scopes: " + this.scopes.mkString(" "))
+      val last = line.length
+      // first apply our matches to the line, accumulating scoping steps
+      @inline @tailrec def loop (start :Int, prevEnd :Int) :Unit = if (start <= last) {
+        val end = matchers.head.apply(this, line, start)
+        // if we match something, keep going from the end of the match
+        if (end > start) loop(end, end)
+        // otherwise advance one character and try again
+        else loop(start+1, prevEnd)
+      }
+      loop(0, 0)
+      if (last > lastPos) spans += Span(scopes, lastPos, last)
+      this
+    }
+  }
 
   /** Handles matching a pattern and applying a set of captures. */
   class Pattern (regexp :String, p :JPattern, captures :List[(Int,String)]) {
@@ -82,41 +106,75 @@ object Matcher {
     private[this] val m = p.matcher("").useTransparentBounds(true)
     private[this] val fullLine = regexp startsWith "^"
 
-    var matched = false
-    @inline private def note (matched :Boolean) = { this.matched = matched ; matched }
-
-    def apply (buf :Buffer, loc :Loc, end :Loc) :Boolean = note {
-      if (fullLine && loc.col != 0) false
-      else {
-        val line = buf.line(loc)
-        m.reset(line)
-        m.region(loc.col, line.length)
-        m.lookingAt
-      }
+    def apply (line :LineV, start :Int) :Boolean = if (fullLine && start != 0) false else {
+      m.reset(line)
+      m.region(start, line.length)
+      m.lookingAt
     }
 
-    def capture (spans :TreeSet[Span.Impl], loc :Loc) :Loc = if (!matched) loc else {
-      @tailrec @inline def loop (captures :List[(Int,String)]) :Unit = if (!captures.isEmpty) {
-        val group = captures.head._1 ; val name = captures.head._2
+    def capture (state :Matcher.State, start :Int) :Int = {
+      // turn the captures into a list of matches
+      case class Match (name :String, start :Int, end :Int) {
+        def push () = state.pushScope(start, name)
+        def pop () = state.popScope(end, name)
+      }
+      val ms = new ArrayBuffer[Match](captures.size)
+      var cs = captures ; while (!cs.isEmpty) {
+        val group = cs.head._1 ; val name = cs.head._2
         try {
-          val start = m.start(group)
-          if (start >= 0) spans add Span(Some(name), None, loc.atCol(start), loc.atCol(m.end(group)))
+          val mstart = m.start(group)
+          if (mstart >= 0) ms += Match(name, mstart, m.end(group))
         } catch {
           case e :Exception =>
-            println(s"Capture failure [regexp=$regexp, group=$group, name=$name]: ${e.getMessage}")
+            println(s"Capture failure [re=$regexp, grp=$group, name=$name]: ${e.getMessage}")
         }
-        loop(captures.tail)
+        cs = cs.tail
       }
-      loop(captures)
-      loc.atCol(m.end)
+      // now emit push/pops for those matches, in proper nesting order
+      def emit (ii :Int) :Unit = if (ii < ms.length) {
+        val m = ms(ii)
+        m.push()
+        // if the next match is "inside" this one, we need to "nest" its push/pops inside ours
+        if (ii < ms.length-1 && ms(ii+1).start < m.end) { emit(ii+1) ; m.pop() }
+        else { m.pop() ; emit(ii+1) }
+      }
+      emit(0)
+      m.end
     }
 
-    override def toString = s"${p.toString}(${captures.map(_._1).mkString})"
+    override def toString = s"${p.toString} (${captures.map(_._1).mkString})"
   }
 
+  /** Returns a matcher that applies `matchers` in turn, stopping when one of them matches
+    * something. */
+  def first (matchers :List[Matcher]) = new Matcher() {
+    def apply (state :Matcher.State, line :LineV, start :Int) =
+      applyFirst(matchers, state, line, start)
+    def show (expand :Set[String], depth :Int) = showAt(matchers, expand, depth)
+  }
+
+  /** Returns a pattern that matches `regexp` and names groups per `captures`. */
+  def pattern (regexp :String, captures :List[(Int,String)]) :Pattern = try {
+    // captures have to be in ascending order, so we sort them to be sure
+    new Pattern(regexp, JPattern.compile(regexp), captures.sortBy(_._1))
+  } catch {
+    case e :Exception =>
+      println(s"Error compiling '$regexp': ${e.getMessage}")
+      new Pattern("NOMATCH", JPattern.compile("NOMATCH"), captures)
+  }
+
+  @tailrec private def applyFirst (ms :List[Matcher], state :State, line :LineV, start :Int) :Int =
+    if (ms.isEmpty) start else {
+      val end = ms.head.apply(state, line, start)
+      if (end != start) end else applyFirst(ms.tail, state, line, start)
+    }
+
+  private def showAt (ms :List[Matcher], expand :Set[String], depth :Int) =
+    if (ms.isEmpty) "" else ms.map(_.show(expand, depth)).mkString("\n", "\n", "")
+
   class Deferred (group :String, incFn :String => List[Matcher]) extends Matcher {
-    def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) =
-      applyFirst(incFn(group), spans, buf, start, end)
+    def apply (state :Matcher.State, line :LineV, start :Int) =
+      applyFirst(incFn(group), state, line, start)
 
     def show (expand :Set[String], depth :Int) =
       nest(depth, s"Deferred($group)") + showAt(
@@ -125,35 +183,47 @@ object Matcher {
 
   /** A matcher that matches a regexp in a single line. */
   class Single (pattern :Pattern) extends Matcher {
-    def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) =
-      if (!pattern.apply(buf, start, end)) start
-      else pattern.capture(spans, start)
+    def apply (state :Matcher.State, line :LineV, start :Int) =
+      if (!pattern.apply(line, start)) start
+      else {
+        val end = pattern.capture(state, start)
+        // println(s"Matched $start-$end $pattern $line")
+        end
+      }
     def show (expand :Set[String], depth :Int) = nest(depth, s"Single($pattern)")
   }
 
   /** A matcher that matches a begin regexp, then applies a set of nested matchers until an end
     * regexp is seen (potentially on a new line). */
-  class Multi (open :Pattern, close :Pattern, name :Option[String], contentName :Option[String],
-               contentMatchers :List[Matcher]) extends Matcher {
+  class Multi (open :Pattern, close :Pattern, name :Option[String],
+               contentName :Option[String], contentMatchers :List[Matcher]) extends Matcher {
 
-    private[this] val atEnd = (buf :Buffer, start :Loc, end :Loc) => close.apply(buf, start, end)
-
-    override def apply (spans :TreeSet[Span.Impl], buf :Buffer, start :Loc, end :Loc) = {
-      if (!open.apply(buf, start, end)) start
-      else {
-        val contentStart = open.capture(spans, start)
-        val contentEnd = applyTo(contentMatchers, spans, buf, contentStart, end, atEnd)
-        // we always add a content span, whether we have a name or not, with a special matcher that
-        // can reprocess just the content of this match
-        spans add Span(contentName, Some(top(contentMatchers)), contentStart, contentEnd)
-        if (!close.matched) contentEnd
+    private[this] val contentEnd = new Matcher() {
+      def apply (state :Matcher.State, line :LineV, start :Int) =
+        if (!close.apply(line, start)) applyFirst(contentMatchers, state, line, start)
         else {
-          val endEnd = close.capture(spans, contentEnd)
-          name.map(nm => spans add Span(Some(nm), None, start, endEnd))
-          endEnd
+          // println(s"Matched close $start $close $line")
+          state.popScope(start, contentName)
+          val end = close.capture(state, start)
+          if (state.matchers.head != this) throw new IllegalStateException(
+            s"Want to pop $this but see ${state.matchers.head}")
+          state.matchers = state.matchers.tail
+          state.popScope(end, name)
+          end
         }
-      }
+      def show (expand :Set[String], depth :Int) = showAt(contentMatchers, expand, depth)
     }
+
+    def apply (state :Matcher.State, line :LineV, start :Int) =
+      if (!open.apply(line, start)) start
+      else {
+        // println(s"Matched open $start $open $name $contentName $line")
+        state.pushScope(start, name)
+        val contentStart = open.capture(state, start)
+        state.matchers = contentEnd :: state.matchers
+        state.pushScope(contentStart, contentName)
+        contentStart
+      }
 
     def show (expand :Set[String], depth :Int) =
       nest(depth, s"Multi($open, $close, $name, $contentName)") + showAt(
