@@ -22,7 +22,7 @@ case class Span (scopes :List[String], start :Int, end :Int) {
 abstract class Matcher {
 
   /** Applies this matcher to the supplied `line` at `start`. Matched spans are added to `spans`.
-    * @return `start` if no matches were made, the offset following the last match otherwise. */
+    * @return `-1` if no matches were made, the offset following the last match otherwise. */
   def apply (state :Matcher.State, line :LineV, start :Int) :Int
 
   /** Converts this matcher to a string for debugging purposes. */
@@ -86,13 +86,13 @@ object Matcher {
       // println("Scopes: " + this.scopes.mkString(" "))
       val last = line.length
       // first apply our matches to the line, accumulating scoping steps
-      @inline @tailrec def loop (start :Int, prevEnd :Int) :Unit = if (start <= last) {
-        val end = matchers.head.apply(this, line, start)
-        // if we match something, keep going from the end of the match
-        if (end > start) loop(end, end)
-        // otherwise advance one character and try again
-        else loop(start+1, prevEnd)
-      }
+      @inline @tailrec def loop (start :Int, prevEnd :Int) :Unit =
+        if (start <= last) matchers.head.apply(this, line, start) match {
+          // if we match nothing, advance one character and try again
+          case  -1 => loop(start+1, prevEnd)
+          // otherwise, keep going from the end of the match
+          case end => loop(end, end) // TODO: check for loopus infinitus?
+        }
       loop(0, 0)
       if (last > lastPos) spans += Span(scopes, lastPos, last)
       this
@@ -164,9 +164,10 @@ object Matcher {
   }
 
   @tailrec private def applyFirst (ms :List[Matcher], state :State, line :LineV, start :Int) :Int =
-    if (ms.isEmpty) start else {
-      val end = ms.head.apply(state, line, start)
-      if (end != start) end else applyFirst(ms.tail, state, line, start)
+    if (ms.isEmpty) -1
+    else ms.head.apply(state, line, start) match {
+      case  -1 => applyFirst(ms.tail, state, line, start)
+      case end => end
     }
 
   private def showAt (ms :List[Matcher], expand :Set[String], depth :Int) =
@@ -184,12 +185,15 @@ object Matcher {
   /** A matcher that matches a regexp in a single line. */
   class Single (pattern :Pattern) extends Matcher {
     def apply (state :Matcher.State, line :LineV, start :Int) =
-      if (!pattern.apply(line, start)) start
-      else {
+      if (pattern.apply(line, start)) {
+        // println(s"Matched $start $pattern $line")
         val end = pattern.capture(state, start)
-        // println(s"Matched $start-$end $pattern $line")
-        end
-      }
+        // we're not going to change the matcher stack, so if we somehow match a zero-length span,
+        // we can't claim that match because otherwise will end up right back here matching again
+        // in ye olde infinite loop; so instead we ignore this degenerate match; write better
+        // regular expressions people!
+        if (end == start) -1 else end
+      } else -1
     def show (expand :Set[String], depth :Int) = nest(depth, s"Single($pattern)")
   }
 
@@ -199,31 +203,34 @@ object Matcher {
                contentName :Option[String], contentMatchers :List[Matcher]) extends Matcher {
 
     private[this] val contentEnd = new Matcher() {
-      def apply (state :Matcher.State, line :LineV, start :Int) =
-        if (!close.apply(line, start)) applyFirst(contentMatchers, state, line, start)
-        else {
-          // println(s"Matched close $start $close $line")
-          state.popScope(start, contentName)
-          val end = close.capture(state, start)
-          if (state.matchers.head != this) throw new IllegalStateException(
-            s"Want to pop $this but see ${state.matchers.head}")
-          state.matchers = state.matchers.tail
-          state.popScope(end, name)
-          end
+      def apply (state :Matcher.State, line :LineV, start :Int) = {
+        applyFirst(contentMatchers, state, line, start) match {
+          case -1 =>
+            if (close.apply(line, start)) {
+              // println(s"Matched close $start $close $line")
+              state.popScope(start, contentName)
+              val end = close.capture(state, start)
+              if (state.matchers.head != this) throw new IllegalStateException(
+                s"Want to pop $this but see ${state.matchers.head}")
+              state.matchers = state.matchers.tail
+              state.popScope(end, name)
+              end
+            } else -1
+          case end => end
         }
+      }
       def show (expand :Set[String], depth :Int) = showAt(contentMatchers, expand, depth)
     }
 
     def apply (state :Matcher.State, line :LineV, start :Int) =
-      if (!open.apply(line, start)) start
-      else {
+      if (open.apply(line, start)) {
         // println(s"Matched open $start $open $name $contentName $line")
         state.pushScope(start, name)
         val contentStart = open.capture(state, start)
         state.matchers = contentEnd :: state.matchers
         state.pushScope(contentStart, contentName)
         contentStart
-      }
+      } else -1
 
     def show (expand :Set[String], depth :Int) =
       nest(depth, s"Multi($open, $close, $name, $contentName)") + showAt(
