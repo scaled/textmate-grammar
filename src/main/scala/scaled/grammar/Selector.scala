@@ -18,23 +18,25 @@ abstract class Selector {
 
 object Selector {
 
-  /** A type alias for a fn applied to a region of a buffer due to matching a selector. */
-  type SpanFn = (Buffer,Loc,Loc) => Unit
+  /** A hook that applies a fn to spans which match a scope selector. */
+  abstract class Fn (val selector: Selector) {
+    /** Called for every span that matches our `selector`. */
+    def apply (buf :Buffer, start :Loc, end :Loc) :Unit
+  }
 
   /** A helper class for using a group of selectors to process a buffer. The canonical use is to use
     * a collection of selector to style mappings (i.e. a TextMate theme) to apply style classes to
     * the approriate regions of the buffer.
     */
-  class Processor (sels :List[(Selector, SpanFn)]) {
+  class Processor (sels :List[Fn]) {
     def apply (buf :Buffer, row :Int, span :Span) {
-      @inline @tailrec def maxMatches (sels :List[(Selector, SpanFn)], depth :Int,
-                                       matches :List[SpanFn]) :List[SpanFn] = {
+      @inline @tailrec def maxMatches (sels :List[Fn], depth :Int, matches :List[Fn]) :List[Fn] = {
         // TODO: revamp this to be more efficient
         if (sels.isEmpty) matches
         else {
-          val d = sels.head._1.matchDepth(span.scopes)
-          if (d > depth) maxMatches(sels.tail, d, sels.head._2 :: Nil)
-          else if (d == depth) maxMatches(sels.tail, d, sels.head._2 :: matches)
+          val d = sels.head.selector.matchDepth(span.scopes)
+          if (d > depth) maxMatches(sels.tail, d, sels.head :: Nil)
+          else if (d == depth) maxMatches(sels.tail, d, sels.head :: matches)
           else maxMatches(sels.tail, depth, matches)
         }
       }
@@ -65,6 +67,7 @@ object Selector {
         else loop(ss.tail, math.max(max, ss.head.matchDepth(scopes)))
       loop(sels, -1)
     }
+    override def toString = sels.mkString(", ")
   }
 
   private class Exclude (want :Selector, dontWant :Selector) extends Selector {
@@ -72,6 +75,7 @@ object Selector {
       val d = want.matchDepth(scopes)
       if (dontWant.matchDepth(scopes) == -1) d else -1
     }
+    override def toString = s"$want - $dontWant"
   }
 
   private class Path (pres :List[String]) extends Selector {
@@ -83,5 +87,6 @@ object Selector {
         else loop(ss.tail, ps.tail, if (depth == -1) ss.length else depth)
       loop(scopes, pres, -1)
     }
+    override def toString = pres.reverse.mkString(" ")
   }
 }

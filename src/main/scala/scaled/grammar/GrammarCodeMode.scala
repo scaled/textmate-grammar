@@ -9,16 +9,16 @@ import scaled.major.CodeMode
 
 object GrammarCodeConfig extends Config.Defs {
 
-  /** An alias for a (`Selector`, style fn) pair. */
-  type Effacer = (Selector, (Buffer,Loc,Loc) => Unit)
-
   /** Compiles `selector` into a TextMate grammar selector and pairs it with a function that applies
     * `cssClass` to buffer spans matched by the selector. */
-  def effacer (selector :String, cssClass :String) :Effacer =
-    (Selector.parse(selector), (buf :Buffer, start :Loc, end :Loc) => {
-      // println(s"Applying $cssClass to $span")
-      buf.updateStyles(_ - codeP + cssClass, start, end)
-    })
+  def effacer (selector :String, cssClass :String) :Selector.Fn =
+    new Selector.Fn(Selector.parse(selector)) {
+      def apply (buf :Buffer, start :Loc, end :Loc) {
+        // println(s"Applying $cssClass to $span")
+        buf.updateStyles(_ - codeP + cssClass, start, end)
+      }
+      override def toString =  s"'$selector' => $cssClass"
+    }
 
   /** A predicate we use to strip `code` styles from a line before restyling it. */
   private val codeP = (style :String) => style startsWith "code"
@@ -36,7 +36,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
 
   /** Returns the effacers used to colorize code for this mode. Defaults to the empty list, which
     * indicates that the mode does not desire to colorize. */
-  protected def effacers :List[Effacer] = Nil
+  protected def effacers :List[Selector.Fn] = Nil
 
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
