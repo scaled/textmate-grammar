@@ -10,16 +10,16 @@ import org.junit._
 class SelectorTest {
 
   @Test def testMatchDepth () {
-    val scopes = List("comment.block.documentation.javadoc",
-                      "meta.documentation.comment.javadoc",
-                      "text.html",
-                      "meta.directive.literal.javadoc",
+    val scopes = List("punctuation.definition.keyword.javadoc",
                       "keyword.other.documentation.directive.literal.javadoc",
-                      "punctuation.definition.keyword.javadoc")
+                      "meta.directive.literal.javadoc",
+                      "text.html",
+                      "meta.documentation.comment.javadoc",
+                      "comment.block.documentation.javadoc")
 
     val sel1 = Selector.parse("keyword")
-    assertEquals(4, sel1.matchDepth(scopes))
+    assertEquals(5, sel1.matchDepth(scopes))
     val sel2 = Selector.parse("comment")
-    assertEquals(0, sel2.matchDepth(scopes))
+    assertEquals(1, sel2.matchDepth(scopes))
   }
 }
