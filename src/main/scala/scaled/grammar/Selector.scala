@@ -41,9 +41,17 @@ object Selector {
         }
       }
       val start = Loc(row, span.start) ; val end = Loc(row, span.end)
-      var fns = maxMatches(sels, 0, Nil) ; while (!fns.isEmpty) {
+      var fns = maxMatches(sels, 0, Nil)
+      if (fns.isEmpty) onUnmatched(buf, start, end)
+      else while (!fns.isEmpty) {
         fns.head(buf, start, end) ; fns = fns.tail
       }
+    }
+
+    /** Called for spans that did not match any of our supplied selectors. This is useful, for
+      * example, for clearing styles from unmatched spans which may have previously matched.
+      */
+    protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
     }
   }
 

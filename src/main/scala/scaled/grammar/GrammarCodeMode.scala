@@ -21,7 +21,7 @@ object GrammarCodeConfig extends Config.Defs {
     }
 
   /** A predicate we use to strip `code` styles from a line before restyling it. */
-  private val codeP = (style :String) => style startsWith "code"
+  val codeP = (style :String) => style startsWith "code"
 }
 
 /** Extends [[CodeMode]] with support for using TextMate grammars for code highlighting. Code major
@@ -40,7 +40,11 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
 
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
-    val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers))
+    val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers) {
+      override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
+        buf.updateStyles(_ - codeP, start, end) // clear any code styles
+      }
+    })
     new Scoper(grammars, view.buffer, procs)
   }
 
