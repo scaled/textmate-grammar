@@ -5,13 +5,13 @@
 package scaled.grammar
 
 import scaled._
-import scaled.major.CodeMode
+import scaled.major.TextMode
 
-/** Extends [[CodeMode]] with support for using TextMate grammars for code highlighting. Code major
-  * modes which intend to use TextMate grammars for code highlighting and other purposes should
-  * extend this class rather than [[CodeMode]].
+/** Extends [[TextMode]] with support for using TextMate grammars for code highlighting.
+  * Non-code major modes which intend to use TextMate grammars for code highlighting and other
+  * purposes should extend this class rather than [[TextMode]].
   */
-abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
+abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   import GrammarConfig._
 
   /** Returns the grammars used by this mode. */
@@ -25,7 +25,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   val scoper = {
     val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers) {
       override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
-        buf.updateStyles(_ - codeP, start, end) // clear any code styles
+        buf.updateStyles(_ - textP, start, end) // clear any text styles
       }
     })
     new Scoper(grammars, buffer, procs)
