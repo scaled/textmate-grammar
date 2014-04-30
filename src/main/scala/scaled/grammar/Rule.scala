@@ -5,7 +5,7 @@
 package scaled.grammar
 
 import java.io.PrintStream
-import scala.collection.mutable.{Map => MMap, Set => MSet}
+import scala.collection.mutable.{Builder, Map => MMap}
 import scaled._
 
 /** Models a single TextMate grammar rule. Instead of having one giant intertwingled mess, we model
@@ -22,7 +22,7 @@ abstract class Rule {
   def print (out :PrintStream, depth :Int) :Unit
 
   /** Adds any scope names matched by this rule to `names`. */
-  def collectNames (names :MSet[String]) {}
+  def collectNames (names :Builder[String,_]) {}
 
   protected def print (out :PrintStream, depth :Int, text :String) {
     out.print(" " * depth)
@@ -40,7 +40,7 @@ object Rule {
   case class Container (patterns :List[Rule]) extends Rule {
     override def compile (incFn :String => List[Matcher]) = patterns.flatMap(_.compile(incFn))
     override def print (out :PrintStream, depth :Int) = patterns.foreach(_.print(out, depth+1))
-    override def collectNames (names :MSet[String]) = patterns.foreach(_.collectNames(names))
+    override def collectNames (names :Builder[String,_]) = patterns.foreach(_.collectNames(names))
   }
 
   case class Single (pattern :String, name :Option[String], captures :List[(Int,String)])
@@ -51,8 +51,8 @@ object Rule {
     }
     override def print (out :PrintStream, depth :Int) =
       print(out, depth, s"Single($pattern, $name, ${fmt(captures)}")
-    override def collectNames (names :MSet[String]) {
-      name.foreach(names.add)
+    override def collectNames (names :Builder[String,_]) {
+      name.foreach(names += _)
       names ++= captures.map(_._2)
     }
   }
@@ -70,9 +70,9 @@ object Rule {
         s"nm=${name getOrElse "<none>"}, cnm=${contentName getOrElse "<none>"})")
       patterns.foreach(_.print(out, depth+1))
     }
-    override def collectNames (names :MSet[String]) {
-      name.foreach(names.add)
-      contentName.foreach(names.add)
+    override def collectNames (names :Builder[String,_]) {
+      name.foreach(names += _)
+      contentName.foreach(names += _)
       names ++= beginCaptures.map(_._2)
       names ++= endCaptures.map(_._2)
     }

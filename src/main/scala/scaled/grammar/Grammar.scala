@@ -6,7 +6,8 @@ package scaled.grammar
 
 import java.io.{File, InputStream, PrintStream}
 import scala.annotation.tailrec
-import scala.collection.mutable.{ArrayBuffer, Map => MMap, TreeSet}
+import scala.collection.immutable.TreeSet
+import scala.collection.mutable.{ArrayBuffer, Map => MMap}
 import scaled._
 
 /** Contains the data for a TextMate language grammar. Certain elements are omitted as they do not
@@ -34,11 +35,11 @@ abstract class Grammar (
   }
 
   /** Returns all scope names used by all rules in this grammar. */
-  def scopeNames () :scala.collection.Set[String] = {
-    val names = TreeSet[String]()
+  def scopeNames () :Set[String] = {
+    val names = TreeSet.newBuilder[String]
     repository.values foreach { _.collectNames(names) }
     patterns foreach { _.collectNames(names) }
-    names
+    names.result
   }
 
   /** A rule which includes a group of rules from the repository. */
