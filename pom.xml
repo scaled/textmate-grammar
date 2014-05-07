@@ -16,7 +16,6 @@
       <groupId>com.samskivert.scaled</groupId>
       <artifactId>scaled-api</artifactId>
       <version>1.0-SNAPSHOT</version>
-      <scope>provided</scope>
     </dependency>
 
     <dependency>
