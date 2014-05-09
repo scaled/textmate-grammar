@@ -15,11 +15,11 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   import GrammarConfig._
 
   /** Returns the grammars used by this mode. */
-  protected def grammars :Seq[Grammar]
+  def grammars :Seq[Grammar]
 
   /** Returns the effacers used to colorize code for this mode. Defaults to the empty list, which
     * indicates that the mode does not desire to colorize. */
-  protected def effacers :List[Selector.Fn] = Nil
+  def effacers :List[Selector.Fn] = Nil
 
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
