@@ -5,7 +5,7 @@
 package scaled.grammar
 
 import scaled._
-import scaled.major.CodeMode
+import scaled.code.CodeMode
 
 /** Extends [[CodeMode]] with support for using TextMate grammars for code highlighting. Code major
   * modes which intend to use TextMate grammars for code highlighting and other purposes should
