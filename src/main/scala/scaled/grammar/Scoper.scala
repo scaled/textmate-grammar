@@ -48,17 +48,23 @@ class Scoper (grammars :Seq[Grammar], buf :RBuffer, procs :List[Selector.Process
   buf.edited.onValue { _ match {
     case Buffer.Insert(start, end) => // rethink the start row, insert (and think) any new rows
       val srow = start.row ; val erow = end.row
-      states(srow) = rethink(srow)
+      val ostate = states(srow) ; val nstate = rethink(srow)
+      states(srow) = nstate
       var row = srow+1 ; while (row <= erow) { states.insert(row, rethink(row)) ; row += 1 }
+      // rethink the line following the insert if the insert changed its start state
+      if (ostate nequiv nstate) cascadeRethink(row)
 
     case Buffer.Delete(start, end, _) => // rethink the start row, delete nixed rows
       val srow = start.row ; val erow = end.row
-      states(srow) = rethink(srow)
+      val ostate = states(erow) ; val nstate = rethink(srow)
+      states(srow) = nstate
       if (erow > srow) states.remove(srow+1, erow-srow)
+      if (ostate nequiv nstate) cascadeRethink(srow+1)
 
     case Buffer.Transform(start, end, _) => // rethink all the transformed rows
       val erow = end.row ; var row = start.row
       while (row <= erow) { states(row) = rethink(row) ; row += 1 }
+      // TODO: we should trigger a cascade rethink if the last row state changed
   }}
 
   private def rethink (row :Int) :Matcher.State = {
@@ -67,5 +73,14 @@ class Scoper (grammars :Seq[Grammar], buf :RBuffer, procs :List[Selector.Process
     val state = pstate.continue(buf.lines(row))
     state.apply(procs, buf, row)
     state
+  }
+
+  // rethinks row; if end of row state changed, rethinks the next row as well; &c
+  private def cascadeRethink (row :Int) {
+    if (row < states.length) {
+      val ostate = states(row) ; val nstate = rethink(row)
+      states(row) = nstate
+      if (ostate nequiv nstate) cascadeRethink(row+1)
+    }
   }
 }

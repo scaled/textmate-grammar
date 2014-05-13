@@ -60,6 +60,9 @@ object Matcher {
     /** Genertes a debug representation of our scopes. */
     def showScopes :String = spans.mkString(" ")
 
+    /** Returns true if this matcher is NOT equivalent to `other`. */
+    def nequiv (other :State) :Boolean = matchers != other.matchers || scopes != other.scopes
+
     //
     // implementation details
 
