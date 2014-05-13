@@ -21,23 +21,29 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
     * indicates that the mode does not desire to colorize. */
   def effacers :List[Selector.Fn] = Nil
 
+  /** Returns the syntaxers used to assign syntax for this mode. Defaults to the empty list, which
+    * indicates that the mode does not desire to syntax. */
+  def syntaxers :List[Selector.Fn] = Nil
+
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
-    val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers) {
+    val procs = List.newBuilder[Selector.Processor]
+    if (!effacers.isEmpty) procs += new Selector.Processor(effacers) {
       override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
         buf.updateStyles(_ - codeP, start, end) // clear any code styles
       }
-    })
-    new Scoper(grammars, buffer, procs)
+    }
+    if (!syntaxers.isEmpty) procs += new Selector.Processor(syntaxers)
+    new Scoper(grammars, buffer, procs.result)
   }
 
   override def configDefs = GrammarConfig :: super.configDefs
   override def keymap = super.keymap ++ Seq(
-    "M-A-p" -> "show-syntax" // TODO: also M-PI?
+    "M-A-p" -> "show-scopes" // TODO: also M-PI?
   )
 
   @Fn("Displays the TextMate syntax scopes at the point.")
-  def showSyntax () {
+  def showScopes () {
     val ss = scoper.scopesAt(view.point())
     view.popup() = Popup(if (ss.isEmpty) List("No scopes.") else ss, Popup.UpRight(view.point()))
   }

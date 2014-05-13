@@ -20,6 +20,14 @@ object GrammarConfig extends Config.Defs {
       override def toString =  s"'$selector' => $cssClass"
     }
 
+  /** Compiles `selector` into a TextMate grammar selector and pairs it with a function that
+    * applies `syntax` to buffer spans matched by the selector. */
+  def syntaxer (selector :String, syntax :Syntax) :Selector.Fn =
+    new Selector.Fn(Selector.parse(selector)) {
+      def apply (buf :Buffer, start :Loc, end :Loc) :Unit = buf.setSyntax(syntax, start, end)
+      override def toString =  s"'$selector' => $syntax"
+    }
+
   /** A predicate we use to strip `code` styles from a line before restyling it. */
   val codeP = (style :String) => style startsWith "code"
 
