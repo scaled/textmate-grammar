@@ -33,7 +33,11 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
         buf.updateStyles(_ - codeP, start, end) // clear any code styles
       }
     }
-    if (!syntaxers.isEmpty) procs += new Selector.Processor(syntaxers)
+    if (!syntaxers.isEmpty) procs += new Selector.Processor(syntaxers) {
+      override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
+        buf.setSyntax(Syntax.Default, start, end) // reset syntax
+      }
+    }
     new Scoper(grammars, buffer, procs.result)
   }
 
