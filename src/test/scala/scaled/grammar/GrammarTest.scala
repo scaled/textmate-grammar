@@ -94,8 +94,7 @@ class GrammarTest {
             single("""\*\s*((\@)\S+)\s""", captures = List(1 -> KeyDoc("custom"), 2 -> JdKey)))))
   }
 
-  def testBuffer (name :String, text :String) =
-    BufferImpl(name, new File(name), new StringReader(text))
+  def testBuffer (name :String, text :String) = BufferImpl(new TextStore(name, "", text))
 
   def assertScopesEqual (want :List[String], got :List[String]) :Unit = {
     if (want != got) {
@@ -177,7 +176,7 @@ class GrammarTest {
 
   @Test def testWordInsert () {
     val (buffer, scoper) = smallTestBits()
-    buffer.insert(Loc(3, 8), "blah ", Styles.None)
+    buffer.insert(Loc(3, 8), Line("blah "))
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 19)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 20)))
@@ -185,7 +184,7 @@ class GrammarTest {
 
   @Test def testNewlineInsert () {
     val (buffer, scoper) = smallTestBits()
-    buffer.insert(Loc(3, 0), Seq(new Line(""), new Line("")))
+    buffer.insert(Loc(3, 0), Seq(Line(""), Line("")))
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 14)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 15)))
@@ -193,7 +192,7 @@ class GrammarTest {
 
   @Test def testRaggedInsert () {
     val (buffer, scoper) = smallTestBits()
-    buffer.insert(Loc(3, 0), Seq(new Line(" "), new Line(" ")))
+    buffer.insert(Loc(3, 0), Seq(Line(" "), Line(" ")))
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 15)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 16)))
