@@ -30,7 +30,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
     val procs = List.newBuilder[Selector.Processor]
     if (!effacers.isEmpty) procs += new Selector.Processor(effacers) {
       override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
-        buf.updateStyles(_ - codeP, start, end) // clear any code styles
+        buf.removeTags(classOf[String], codeP, start, end) // clear any code styles
       }
     }
     if (!syntaxers.isEmpty) procs += new Selector.Processor(syntaxers) {

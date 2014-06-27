@@ -14,8 +14,9 @@ object GrammarConfig extends Config.Defs {
   def effacer (selector :String, cssClass :String) :Selector.Fn =
     new Selector.Fn(Selector.parse(selector)) {
       def apply (buf :Buffer, start :Loc, end :Loc) {
+        buf.removeTags(classOf[String], codeP, start, end)
         // println(s"Applying $cssClass to $span")
-        buf.updateStyles(_ - codeP + cssClass, start, end)
+        buf.addStyle(cssClass, start, end)
       }
       override def toString =  s"'$selector' => $cssClass"
     }
