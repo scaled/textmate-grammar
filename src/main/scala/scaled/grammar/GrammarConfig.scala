@@ -13,11 +13,7 @@ object GrammarConfig extends Config.Defs {
     * `cssClass` to buffer spans matched by the selector. */
   def effacer (selector :String, cssClass :String) :Selector.Fn =
     new Selector.Fn(Selector.parse(selector)) {
-      def apply (buf :Buffer, start :Loc, end :Loc) {
-        buf.removeTags(classOf[String], codeP, start, end)
-        // println(s"Applying $cssClass to $span")
-        buf.addStyle(cssClass, start, end)
-      }
+      def apply (buf :Buffer, start :Loc, end :Loc) :Unit = buf.addStyle(cssClass, start, end)
       override def toString =  s"'$selector' => $cssClass"
     }
 

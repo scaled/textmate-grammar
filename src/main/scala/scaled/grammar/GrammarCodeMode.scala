@@ -29,8 +29,9 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   val scoper = {
     val procs = List.newBuilder[Selector.Processor]
     if (!effacers.isEmpty) procs += new Selector.Processor(effacers) {
-      override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
-        buf.removeTags(classOf[String], codeP, start, end) // clear any code styles
+      override def onBeforeLine (buf :Buffer, row :Int) { // clear any code styles
+        val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
+        if (start != end) buf.removeTags(classOf[String], codeP, start, end)
       }
     }
     if (!syntaxers.isEmpty) procs += new Selector.Processor(syntaxers) {

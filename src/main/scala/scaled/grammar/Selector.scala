@@ -29,6 +29,13 @@ object Selector {
     * the approriate regions of the buffer.
     */
   class Processor (sels :List[Fn]) {
+
+    /** Called before applying this processor to any spans on `row` in `buf`. */
+    def onBeforeLine (buf :Buffer, row :Int) {
+      // nada by default
+    }
+
+    /** Applies this processor to the `span` on `row` in `buf`. */
     def apply (buf :Buffer, row :Int, span :Span) {
       @inline @tailrec def maxMatches (sels :List[Fn], depth :Int, matches :List[Fn]) :List[Fn] = {
         // TODO: revamp this to be more efficient

@@ -24,8 +24,9 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
     val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers) {
-      override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
-        buf.removeTags(classOf[String], textP, start, end) // clear any text styles
+      override def onBeforeLine (buf :Buffer, row :Int) { // clear any text styles
+        val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
+        if (start != end) buf.removeTags(classOf[String], textP, start, end)
       }
     })
     new Scoper(grammars, buffer, procs)

@@ -51,10 +51,13 @@ object Matcher {
     def continue (line :LineV) :State = new State(matchers, scopes).process(line)
 
     /** Applies `procs` to the spans matched on this line. */
-    @tailrec final def apply (procs :List[Selector.Processor], buf :Buffer, row :Int) {
-      @inline @tailrec def loop (proc :Selector.Processor, ii :Int) :Unit =
-        if (ii < spans.length) { proc.apply(buf, row, spans(ii)) ; loop(proc, ii+1) }
-      if (!procs.isEmpty) { loop(procs.head, 0) ; apply(procs.tail, buf, row) }
+    def apply (procs :List[Selector.Processor], buf :Buffer, row :Int) {
+      val sp = spans ; val ll = sp.length
+      var pp = procs ; while (!pp.isEmpty) {
+        val proc = pp.head ; proc.onBeforeLine(buf, row)
+        var ii = 0 ; while (ii < ll) { proc.apply(buf, row, sp(ii)); ii += 1 }
+        pp = pp.tail
+      }
     }
 
     /** Returns the scopes at `pos` on this line. */
