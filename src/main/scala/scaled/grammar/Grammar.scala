@@ -24,14 +24,19 @@ abstract class Grammar (
   val repository :Map[String,Rule]
   val patterns   :List[Rule]
 
-  override def toString =
-    s"Grammar[$name, $scopeName, fStart=$foldingStartMarker, fStop=$foldingStopMarker]"
+  override def toString = s"Grammar[$name, $scopeName]"
 
   /** Prints a debug representation of this grammar to `out`. */
   def print (out :PrintStream) {
-    out.println(this)
-    repository foreach { case (k, v) => out.println(k) ; v.print(out, 1) }
-    patterns foreach { _.print(out, 0) }
+    val w = new NDF.Writer(out, 0)
+    w.emit("name", name)
+    w.emit("scopeName", scopeName)
+    w.emit("foldStart", foldingStartMarker)
+    w.emit("foldStop", foldingStopMarker)
+    val rw = w.nest("repository")
+    repository.toSeq.sortBy(_._1) foreach { case (k, v) => v.print(rw.nest(k)) }
+    val pw = w.nest("patterns")
+    patterns foreach { _.print(pw) }
   }
 
   /** Returns all scope names used by all rules in this grammar. */
@@ -88,11 +93,16 @@ object Grammar {
     Matcher.first(compilers(grammars.last.scopeName).matchers)
   }
 
+  @deprecated("Use parsePlist")
+  def parse (file :File) :Grammar = parsePlist(file)
+  @deprecated("Use parsePlist")
+  def parse (in :InputStream) :Grammar = parsePlist(in)
+
   /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
-  def parse (file :File) :Grammar = toGrammar(PropertyListParser.parse(file))
+  def parsePlist (file :File) :Grammar = toGrammar(PropertyListParser.parse(file))
 
   /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
-  def parse (in :InputStream) :Grammar = toGrammar(PropertyListParser.parse(in))
+  def parsePlist (in :InputStream) :Grammar = toGrammar(PropertyListParser.parse(in))
 
   private def toGrammar (root :NSObject) :Grammar = {
     val rootDict = root.asInstanceOf[NSDictionary]
@@ -103,8 +113,8 @@ object Grammar {
 
     // val fileTypes = rootDict.objectForKey("fileTypes")
     new Grammar(name, scopeName, foldStart, foldStop) {
-      val repository = Map() ++ dictFor(rootDict, "repository").getHashMap map {
-        case (k, v) => (k -> parseRule(v))
+      val repository = Map() ++ dictFor(rootDict, "repository").getHashMap flatMap {
+        case (k, v) => parseRule(v).map(vr => (k -> vr))
       }
       val patterns = parseRules(rootDict)
     }
@@ -129,31 +139,40 @@ object Grammar {
   }
 
   private def parseRules (dict :NSDictionary) :List[Rule] =
-    arrayFor(dict, "patterns").getArray.map(parseRule).toList
+    List() ++ arrayFor(dict, "patterns").getArray.flatMap(parseRule)
 
-  private def parseRule (data :NSObject) :Rule = {
+  private def parseRule (data :NSObject) :Option[Rule] = try {
     val dict = data.asInstanceOf[NSDictionary]
     val include = stringFor(dict, "include")
     val name = stringFor(dict, "name")
     val `match` = stringFor(dict, "match")
     val begin = stringFor(dict, "begin")
 
-    if (include.isDefined) {
+    val rule = if (include.isDefined) {
       new Rule.Include(include.get)
     } else if (begin.isDefined) {
       val caps = parseCaptures(dictFor(dict, "captures"))
       val beginCaps = if (!dict.containsKey("beginCaptures")) caps else
         parseCaptures(dictFor(dict, "beginCaptures"))
-      val end = stringFor(dict, "end")
+      val end = stringFor(dict, "end") getOrElse {
+        throw new Exception(s"Rule missing end: $name ${`match`}")
+      }
       val endCaps = if (!dict.containsKey("endCaptures")) caps else
         parseCaptures(dictFor(dict, "endCaptures"))
-      new Rule.Multi(begin.get, beginCaps, end.get, endCaps, name, stringFor(dict, "contentName"),
+      new Rule.Multi(begin.get, beginCaps, end, endCaps, name, stringFor(dict, "contentName"),
                      parseRules(dict))
     } else if (`match`.isDefined) {
       new Rule.Single(`match`.get, name, parseCaptures(dictFor(dict, "captures")))
     } else {
       new Rule.Container(parseRules(dict))
     }
+    Some(rule)
+
+  } catch {
+    case e :Exception =>
+      println(s"Rule parse failure: $data")
+      e.printStackTrace(System.out)
+      None
   }
 
   private class Compiler (compilers :MMap[String,Compiler], grammar :Grammar) {

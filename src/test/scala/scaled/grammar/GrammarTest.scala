@@ -229,9 +229,15 @@ class GrammarTest {
   @Test def testParse () {
     val javaDoc = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
     val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
-    val grammars = Seq(Grammar.parse(javaDoc), Grammar.parse(java))
+    val grammars = Seq(Grammar.parsePlist(javaDoc), Grammar.parsePlist(java))
     val buffer = testBuffer("Test.java", testJavaCode)
     val scoper = new Scoper(grammars, buffer, Nil)
     // println(scoper)
   }
+
+  // @Test def testPrint () {
+  //   val javaDoc = Grammar.parsePlist(
+  //     getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage"))
+  //   javaDoc.print(System.out)
+  // }
 }
