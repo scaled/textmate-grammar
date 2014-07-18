@@ -19,7 +19,7 @@ abstract class Rule {
   def compile (incFn :String => List[Matcher]) :List[Matcher]
 
   /** Prints a debug representation of this rule. */
-  def print (out :NDF.Writer) :Unit
+  def print (out :NDF.Writer, children :Boolean = true) :Unit
 
   /** Adds any scope names matched by this rule to `names`. */
   def collectNames (names :Builder[String,_]) {}
@@ -29,12 +29,12 @@ object Rule {
 
   case class Include (group :String) extends Rule {
     override def compile (incFn :String => List[Matcher]) = List(new Matcher.Deferred(group, incFn))
-    override def print (out :NDF.Writer) = out.emit("include", group)
+    override def print (out :NDF.Writer, children :Boolean) = out.emit("include", group)
   }
 
   case class Container (patterns :List[Rule]) extends Rule {
     override def compile (incFn :String => List[Matcher]) = patterns.flatMap(_.compile(incFn))
-    override def print (out :NDF.Writer) = patterns.foreach(_.print(out))
+    override def print (out :NDF.Writer, children :Boolean) = patterns.foreach(_.print(out))
     override def collectNames (names :Builder[String,_]) = patterns.foreach(_.collectNames(names))
   }
 
@@ -42,9 +42,9 @@ object Rule {
       extends Rule {
     override def compile (incFn :String => List[Matcher]) = {
       val caps = name.map(n => (0 -> n) :: captures).getOrElse(captures)
-      List(new Matcher.Single(Matcher.pattern(pattern, caps)))
+      List(new Matcher.Single(Matcher.pattern(this, pattern, caps)))
     }
-    override def print (out :NDF.Writer) = {
+    override def print (out :NDF.Writer, children :Boolean) = {
       val w = out.nest("single")
       w.emit("name", name)
       w.emit("pattern", pattern)
@@ -61,9 +61,10 @@ object Rule {
                     name :Option[String], contentName :Option[String],
                     patterns :List[Rule]) extends Rule {
     override def compile (incFn :String => List[Matcher]) = List(
-      new Matcher.Multi(Matcher.pattern(begin, beginCaptures), Matcher.pattern(end, endCaptures),
+      new Matcher.Multi(Matcher.pattern(this, begin, beginCaptures),
+                        Matcher.pattern(this, end, endCaptures),
                         name, contentName, patterns.flatMap(_.compile(incFn))))
-    override def print (out :NDF.Writer) {
+    override def print (out :NDF.Writer, children :Boolean) {
       val w = out.nest("multi")
       w.emit("name", name)
       w.emit("contentName", contentName)
@@ -71,7 +72,7 @@ object Rule {
       if (!beginCaptures.isEmpty) w.emit("bcaps", fmt(beginCaptures))
       w.emit("end", end)
       if (!endCaptures.isEmpty) w.emit("ecaps", fmt(endCaptures))
-      if (!patterns.isEmpty) {
+      if (children && !patterns.isEmpty) {
         val pw = w.nest("patterns")
         patterns.foreach(_.print(pw))
       }

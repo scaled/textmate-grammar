@@ -175,12 +175,14 @@ object Matcher {
   }
 
   /** Returns a pattern that matches `regexp` and names groups per `captures`. */
-  def pattern (regexp :String, captures :List[(Int,String)]) :Pattern = try {
+  def pattern (source :Rule, regexp :String, captures :List[(Int,String)]) :Pattern = try {
     // captures have to be in ascending order, so we sort them to be sure
     new Pattern(regexp, JPattern.compile(regexp), captures.sortBy(_._1))
   } catch {
     case e :Exception =>
       println(s"Error compiling '$regexp': ${e.getMessage}")
+      println(s"Source rule:")
+      source.print(new NDF.Writer(System.out, 0), false)
       new Pattern("NOMATCH", JPattern.compile("NOMATCH"), captures)
   }
 
