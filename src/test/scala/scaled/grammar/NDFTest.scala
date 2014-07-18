@@ -626,9 +626,9 @@ patterns:
  multi:
   name: markup.list.numbered.markdown
   begin: ^[ ]{0,3}([0-9]+)(\.)(?=\s)
-  bcaps: 1=punctuation.definition.list_item.markdown punctuation.definition.list_item.number.markdown 2=punctuation.definition.list_item.markdown
+  bcaps: 1=punctuation.definition.list_item.number.markdown 2=punctuation.definition.list_item.markdown
   end: ^(?=\S)
-  ecaps: 1=punctuation.definition.list_item.markdown punctuation.definition.list_item.number.markdown 2=punctuation.definition.list_item.markdown
+  ecaps: 1=punctuation.definition.list_item.number.markdown 2=punctuation.definition.list_item.markdown
   patterns:
    include: #fenced-code-blocks
    include: #list-paragraph
@@ -704,5 +704,10 @@ patterns:
                       "image-ref", "inline", "italic", "line-break", "link-email", "link-inet",
                       "link-inline", "link-ref", "link-ref-literal", "list-paragraph", "plain-uri",
                       "raw", "separator", "strikethrough", "tag-kbd"), repoValKeys)
+  }
+
+  @Test def testParseGrammar () {
+    val grammar = NDFGrammar.toGrammar(NDF.read(input.split("\n").toList))
+    grammar.print(System.out)
   }
 }

@@ -4,10 +4,12 @@
 
 package scaled.grammar
 
-import java.io.PrintStream
+import com.google.common.base.Charsets
+import com.google.common.io.CharStreams
+import java.io.{InputStream, InputStreamReader, PrintStream}
 import java.nio.file.{Files, Path}
-import scala.collection.mutable.{Builder, ListBuffer}
 import scala.annotation.tailrec
+import scala.collection.mutable.{Builder, ListBuffer}
 
 /** Provides a simple nested dictionaries format for grammars. */
 object NDF {
@@ -59,6 +61,12 @@ object NDF {
   def read (file :Path) :Seq[Entry] = {
     import scala.collection.convert.WrapAsScala._
     read(List() ++ Files.readAllLines(file))
+  }
+
+  /** Reads the contents of `in`, which must be in NDF format. */
+  def read (in :InputStream) :Seq[Entry] = {
+    import scala.collection.convert.WrapAsScala._
+    read(List() ++ CharStreams.readLines(new InputStreamReader(in, Charsets.UTF_8)))
   }
 
   /** Parses `lines` into a nested dictionary. */

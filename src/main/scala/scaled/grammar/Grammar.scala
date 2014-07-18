@@ -5,6 +5,7 @@
 package scaled.grammar
 
 import java.io.{File, InputStream, PrintStream}
+import java.nio.file.Path
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeSet
 import scala.collection.mutable.{ArrayBuffer, Map => MMap}
@@ -99,81 +100,14 @@ object Grammar {
   def parse (in :InputStream) :Grammar = parsePlist(in)
 
   /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
-  def parsePlist (file :File) :Grammar = toGrammar(PropertyListParser.parse(file))
-
+  def parsePlist (file :File) :Grammar = PlistGrammar.parse(file)
   /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
-  def parsePlist (in :InputStream) :Grammar = toGrammar(PropertyListParser.parse(in))
+  def parsePlist (in :InputStream) :Grammar = PlistGrammar.parse(in)
 
-  private def toGrammar (root :NSObject) :Grammar = {
-    val rootDict = root.asInstanceOf[NSDictionary]
-    val name = stringFor(rootDict, "name") getOrElse "unknown:name"
-    val scopeName = stringFor(rootDict, "scopeName") getOrElse "unknown:scopeName"
-    val foldStart = stringFor(rootDict, "foldingStartMarker")
-    val foldStop  = stringFor(rootDict, "foldingStopMarker")
-
-    // val fileTypes = rootDict.objectForKey("fileTypes")
-    new Grammar(name, scopeName, foldStart, foldStop) {
-      val repository = Map() ++ dictFor(rootDict, "repository").getHashMap flatMap {
-        case (k, v) => parseRule(v).map(vr => (k -> vr))
-      }
-      val patterns = parseRules(rootDict)
-    }
-  }
-
-  private def stringFor (dict :NSDictionary, key :String) = dict.objectForKey(key) match {
-    case nsstr :NSString => Some(nsstr.toString)
-    case _ => None
-  }
-  private def dictFor (dict :NSDictionary, key :String) = dict.objectForKey(key) match {
-    case dval :NSDictionary => dval
-    case _ => new NSDictionary()
-  }
-  private def arrayFor (dict :NSDictionary, key :String) = dict.objectForKey(key) match {
-    case aval :NSArray => aval
-    case _ => new NSArray()
-  }
-
-  private def parseCaptures (dict :NSDictionary) = List() ++ dict flatMap {
-    case (group, vdict :NSDictionary) => Some(group.toInt -> stringFor(vdict, "name").get)
-    case _ => None
-  }
-
-  private def parseRules (dict :NSDictionary) :List[Rule] =
-    List() ++ arrayFor(dict, "patterns").getArray.flatMap(parseRule)
-
-  private def parseRule (data :NSObject) :Option[Rule] = try {
-    val dict = data.asInstanceOf[NSDictionary]
-    val include = stringFor(dict, "include")
-    val name = stringFor(dict, "name")
-    val `match` = stringFor(dict, "match")
-    val begin = stringFor(dict, "begin")
-
-    val rule = if (include.isDefined) {
-      new Rule.Include(include.get)
-    } else if (begin.isDefined) {
-      val caps = parseCaptures(dictFor(dict, "captures"))
-      val beginCaps = if (!dict.containsKey("beginCaptures")) caps else
-        parseCaptures(dictFor(dict, "beginCaptures"))
-      val end = stringFor(dict, "end") getOrElse {
-        throw new Exception(s"Rule missing end: $name ${`match`}")
-      }
-      val endCaps = if (!dict.containsKey("endCaptures")) caps else
-        parseCaptures(dictFor(dict, "endCaptures"))
-      new Rule.Multi(begin.get, beginCaps, end, endCaps, name, stringFor(dict, "contentName"),
-                     parseRules(dict))
-    } else if (`match`.isDefined) {
-      new Rule.Single(`match`.get, name, parseCaptures(dictFor(dict, "captures")))
-    } else {
-      new Rule.Container(parseRules(dict))
-    }
-    Some(rule)
-
-  } catch {
-    case e :Exception =>
-      println(s"Rule parse failure: $data")
-      e.printStackTrace(System.out)
-      None
-  }
+  /** Parses a `tmLanguage` grammar file which should be in NDF format. */
+  def parseNDF (file :Path) :Grammar = NDFGrammar.parse(file)
+  /** Parses a `tmLanguage` grammar description which should be in NDF format. */
+  def parseNDF (in :InputStream) :Grammar = NDFGrammar.parse(in)
 
   private class Compiler (compilers :MMap[String,Compiler], grammar :Grammar) {
     val cache = MMap[String, List[Matcher]]()
