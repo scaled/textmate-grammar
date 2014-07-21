@@ -9,7 +9,7 @@ patterns:
   caps: 1=punctuation.definition.comment.ndf
  # everything else should be 'key: value' or 'key:' followed by nested dictionary
  single:
-  pattern: ^ *([^:=]+)([:=])(.*?)(\\)?$
+  pattern: ^ *([a-zA-Z][^:]+)([:])(.*?)(\\)?$
   caps: 1=keyword.other.ndf 2=punctuation.separator.key-value.ndf 4=punctuation.line-cont.ndf
  # highlight the trailing \ on continued lines
  single:
