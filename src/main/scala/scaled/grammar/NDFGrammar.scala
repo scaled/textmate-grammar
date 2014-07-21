@@ -44,7 +44,7 @@ object NDFGrammar {
       case -1 => println(s"Invalid capture: '$cap'") ; None
       case ii => Some(cap.substring(0, ii).toInt -> cap.substring(ii+1))
     }
-    str.split(" ").flatMap(parse).toList
+    str.split("\\s+").flatMap(parse).toList
   }
   def parseCaptures (str :Option[String]) :List[(Int,String)] = str.map(parseCaptures).getOrElse(List())
 
