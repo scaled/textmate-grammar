@@ -101,12 +101,13 @@ object NDF {
             finally acc += DicEnt(key, nacc.result)
           }
         case s =>
-          println(s"Invalid line: $line (prefix='$pre', split=${s.toList})") // complain and skip this line
+          // complain and skip this line
+          println(s"Invalid line: $line (prefix='$pre', split=${s.toList})")
           rest
       }, acc, pre)
     }
     val acc = Seq.newBuilder[Entry]
-    read(unbreak(lines, ListBuffer[String]()), acc, "")
+    read(unbreak(lines.filterNot(_.trim.startsWith("#")), ListBuffer[String]()), acc, "")
     acc.result
   }
 }
