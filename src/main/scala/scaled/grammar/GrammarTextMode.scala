@@ -40,7 +40,8 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   @Fn("Displays the TextMate syntax scopes at the point.")
   def showSyntax () {
     val ss = scoper.scopesAt(view.point())
-    view.popup() = Popup(if (ss.isEmpty) List("No scopes.") else ss, Popup.UpRight(view.point()))
+    val text = if (ss.isEmpty) List("No scopes.") else ss
+    view.popup() = Popup.text(text, Popup.UpRight(view.point()))
   }
 
   @Fn("Refreshes the colorization of the entire buffer.")
