@@ -23,7 +23,7 @@ object NDFGrammar {
     // val fileTypes = rootDict.objectForKey("fileTypes")
     new Grammar(name, scopeName, foldStart, foldStop) {
       val repository = Map() ++ dicts.getOrElse("repository", Seq()).flatMap {
-        case DicEnt(k, v) => parseRule(v.head).map(vr => (k -> vr))
+        case DicEnt(k, v) => Some(k -> new Rule.Container(v.flatMap(parseRule).toList))
         case e @ StrEnt(k, v) => println("Invalid repository entry: $e") ; None
       }
       val patterns = parseRules(dicts)
