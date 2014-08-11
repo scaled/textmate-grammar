@@ -28,7 +28,7 @@ class Scoper (grammars :Seq[Grammar], buf :RBuffer, procs :List[Selector.Process
   def showMatchers (expand :Set[String]) :String = topMatcher.show(expand, 0)
 
   /** Generates a debugging representation of this scoper's scope assignments. */
-  def showScopes (row :Int) :String = states(row).showScopes
+  def showScopes (row :Int) :Seq[String] = states(row).showScopes
 
   /** Applies the registered processors to the entire buffer. */
   def applyProcs () {

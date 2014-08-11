@@ -64,7 +64,7 @@ object Matcher {
     def scopesAt (pos :Int) :List[String] = spans.find(_.contains(pos)).map(_.scopes) getOrElse Nil
 
     /** Genertes a debug representation of our scopes. */
-    def showScopes :String = spans.mkString(" ")
+    def showScopes :Seq[String] = spans.map(_.toString)
 
     /** Returns true if this matcher is NOT equivalent to `other`. */
     def nequiv (other :State) :Boolean = matchers != other.matchers || scopes != other.scopes
