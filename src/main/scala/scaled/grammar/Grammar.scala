@@ -94,11 +94,6 @@ object Grammar {
     Matcher.first(compilers(grammars.last.scopeName).matchers)
   }
 
-  @deprecated("Use parsePlist")
-  def parse (file :File) :Grammar = parsePlist(file)
-  @deprecated("Use parsePlist")
-  def parse (in :InputStream) :Grammar = parsePlist(in)
-
   /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
   def parsePlist (file :File) :Grammar = PlistGrammar.parse(file)
   /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
