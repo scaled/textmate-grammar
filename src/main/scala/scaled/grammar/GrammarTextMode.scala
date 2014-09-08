@@ -33,9 +33,8 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   }
 
   override def configDefs = GrammarConfig :: super.configDefs
-  override def keymap = super.keymap ++ Seq(
-    bind("M-A-p", "show-syntax") // TODO: also M-PI?
-  )
+  override def keymap = super.keymap.
+    bind("M-A-p", "show-syntax"); // TODO: also M-PI?
 
   @Fn("Displays the TextMate syntax scopes at the point.")
   def showSyntax () {
