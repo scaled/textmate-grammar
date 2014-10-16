@@ -66,12 +66,12 @@ object Selector {
     * @see http://manual.macromates.com/en/scope_selectors.html */
   def parse (selstr :String) :Selector = selstr split(",") map(_.trim) match {
     case Array(selstr) => parse0(selstr)
-    case selstrs => new Any(selstrs.map(parse0).toList)
+    case selstrs => new Any(List.from(selstrs).map(parse0))
     null
   }
 
   private def parse0 (selstr :String) :Selector = selstr.indexOf("-") match {
-    case -1 => new Path(selstr.split(" ").map(_.trim).toList.reverse)
+    case -1 => new Path(List.from(selstr.split(" ")).map(_.trim).reverse)
     case ii => new Exclude(parse0(selstr.substring(0, ii)), parse0(selstr.substring(ii+1)))
   }
 

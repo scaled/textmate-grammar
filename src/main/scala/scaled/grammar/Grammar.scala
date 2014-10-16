@@ -6,9 +6,7 @@ package scaled.grammar
 
 import java.io.{File, InputStream, PrintStream}
 import java.nio.file.Path
-import scala.annotation.tailrec
-import scala.collection.immutable.TreeSet
-import scala.collection.mutable.{ArrayBuffer, Map => MMap}
+import java.util.HashMap
 import scaled._
 
 /** Contains the data for a TextMate language grammar. Certain elements are omitted as they do not
@@ -42,17 +40,17 @@ abstract class Grammar (
 
   /** Returns all scope names used by all rules in this grammar. */
   def scopeNames () :Set[String] = {
-    val names = TreeSet.newBuilder[String]
+    val names = Set.builder[String]
     repository.values foreach { _.collectNames(names) }
     patterns foreach { _.collectNames(names) }
-    names.result
+    names.buildSorted()
   }
 
   /** A rule which includes a group of rules from the repository. */
   protected def include (group :String) :Rule = new Rule.Include(group)
 
   /** A rule that just contains more rules. This usually only shows up in the repository. */
-  protected def rules (rules :Rule*) :Rule = new Rule.Container(rules.toList)
+  protected def rules (rules :List[Rule]) :Rule = new Rule.Container(rules)
 
   /** A rule which matches a regular expression on a single line, optionally assigning a name to the
     * entire regexp match, and to invidual capture groups identified by the regexp. */
@@ -76,7 +74,7 @@ abstract class Grammar (
     begin, captures, end, captures, name, contentName, patterns)
 
   /** Useful for generating multiple rules that are variations on a theme. */
-  protected def map (names :String*)(fn :String => Rule) = names map fn
+  protected def map (names :String*)(fn :String => Rule) :List[Rule] = List.copyOf(names) map fn
 }
 
 object Grammar {
@@ -89,7 +87,7 @@ object Grammar {
     * grammar.
     */
   def compile (grammars :Seq[Grammar]) :Matcher = {
-    val compilers = MMap[String,Compiler]()
+    val compilers = new HashMap[String,Compiler]()
     grammars foreach { g => compilers += (g.scopeName -> new Compiler(compilers, g)) }
     Matcher.first(compilers(grammars.last.scopeName).matchers)
   }
@@ -104,22 +102,20 @@ object Grammar {
   /** Parses a `tmLanguage` grammar description which should be in NDF format. */
   def parseNDF (in :InputStream) :Grammar = NDFGrammar.parse(in)
 
-  private class Compiler (compilers :MMap[String,Compiler], grammar :Grammar) {
-    val cache = MMap[String, List[Matcher]]()
+  private class Compiler (compilers :HashMap[String,Compiler], grammar :Grammar) {
+    val cache = new HashMap[String, List[Matcher]]()
     val incFn = (_ :String) match {
       case "$self" => matchers
       case group if (group startsWith "#") => cache.get(group substring 1) match {
-        case Some(ms) => ms
-        case None     => println(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
+        case null => println(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
+        case ms   => ms
       }
       case lang => compilers.get(lang) match {
-        case Some(comp) => comp.matchers
-        case None       => println(s"Unknown include [grammar=${grammar.name}, lang=$lang]") ; Nil
+        case null => println(s"Unknown include [grammar=${grammar.name}, lang=$lang]") ; Nil
+        case comp => comp.matchers
       }
     }
-    grammar.repository foreach {
-      case (k, v) => cache put (k, v.compile(incFn))
-    }
+    grammar.repository foreach { (k, v) => cache.put(k, v.compile(incFn)) }
     lazy val matchers :List[Matcher] = grammar.patterns.flatMap(_.compile(incFn))
   }
 }

@@ -6,6 +6,7 @@ package scaled.grammar
 
 import org.junit.Assert._
 import org.junit._
+import scaled._
 
 class NDFTest {
 
@@ -681,7 +682,7 @@ patterns:
 """
 
   @Test def testRead () {
-    val vals = NDF.read(input.split("\n").toList)
+    val vals = NDF.read(List.from(input.split("\n")))
     assertEquals(List("name", "scopeName", "foldStart", "foldStop", "repository", "patterns"),
                  vals.map(_.key))
 
@@ -707,7 +708,7 @@ patterns:
   }
 
   @Test def testParseGrammar () {
-    val grammar = NDFGrammar.toGrammar(NDF.read(input.split("\n").toList))
+    val grammar = NDFGrammar.toGrammar(NDF.read(List.from(input.split("\n"))))
     grammar.print(System.out)
   }
 }

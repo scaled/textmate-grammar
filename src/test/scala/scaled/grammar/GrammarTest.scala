@@ -7,7 +7,6 @@ package scaled.grammar
 import java.io.{File, StringReader}
 import org.junit.Assert._
 import org.junit._
-import scala.collection.mutable.ArrayBuffer
 import scaled._
 import scaled.impl.BufferImpl
 
@@ -28,12 +27,13 @@ class GrammarTest {
 
     val repository = Map(
       "inline" -> rules(
-        include("#invalid"),
-        include("#inline-formatting"),
+        include("#invalid") ::
+        include("#inline-formatting") ::
         // include("text.html.basic"),
         single("""((https?|s?ftp|ftps|file|smb|afp|nfs|(x-)?man|gopher|txmt):""" +
                """\/\/|mailto:)[-:@a-zA-Z0-9_.~%+\/?=&#]+(?<![.?:])""",
-               name = Some("markup.underline.link"))),
+               name = Some("markup.underline.link")) ::
+        Nil),
 
       "inline-formatting" -> rules(
         map("code", "literal") { kind =>
@@ -55,14 +55,14 @@ class GrammarTest {
                                  4 -> s"markup.underline.$kind.javadoc",
                                  5 -> "string.other.link.title.javadoc",
                                  6 -> JdEnd))
-        } ++ Seq(
+        } ++ List(
           single("""(\{)((\@)value)\s*(\S+?)?\s*(\})""",
                  name = Some("meta.directive.value.javadoc"),
                  captures = List(1 -> JdBegin, 2 -> KeyDir("value"), 3 -> JdKey,
-                                 4 -> "variable.other.javadoc", 5 -> JdEnd))) :_*),
+                                 4 -> "variable.other.javadoc", 5 -> JdEnd)))),
 
       "invalid" -> rules(
-        single("""^(?!\s*\*).*$\n?""", Some("invalid.illegal.missing-asterisk.javadoc")))
+        single("""^(?!\s*\*).*$\n?""", Some("invalid.illegal.missing-asterisk.javadoc")) :: Nil)
     )
 
     // we have to specify a return type here to work around scalac bug; meh

@@ -6,6 +6,7 @@ package scaled.grammar
 
 import org.junit.Assert._
 import org.junit._
+import scaled._
 
 class SelectorTest {
 

@@ -5,7 +5,6 @@
 package scaled.grammar
 
 import java.io.PrintStream
-import scala.collection.mutable.{Builder, Map => MMap}
 import scaled._
 
 /** Models a single TextMate grammar rule. Instead of having one giant intertwingled mess, we model
@@ -22,7 +21,7 @@ abstract class Rule {
   def print (out :NDF.Writer, children :Boolean = true) :Unit
 
   /** Adds any scope names matched by this rule to `names`. */
-  def collectNames (names :Builder[String,_]) {}
+  def collectNames (names :Set.Builder[String]) {}
 }
 
 object Rule {
@@ -35,7 +34,7 @@ object Rule {
   case class Container (patterns :List[Rule]) extends Rule {
     override def compile (incFn :String => List[Matcher]) = patterns.flatMap(_.compile(incFn))
     override def print (out :NDF.Writer, children :Boolean) = patterns.foreach(_.print(out))
-    override def collectNames (names :Builder[String,_]) = patterns.foreach(_.collectNames(names))
+    override def collectNames (names :Set.Builder[String]) = patterns.foreach(_.collectNames(names))
   }
 
   case class Single (pattern :String, name :Option[String], captures :List[(Int,String)])
@@ -50,7 +49,7 @@ object Rule {
       w.emit("pattern", pattern)
       if (!captures.isEmpty) w.emit("caps", fmt(captures))
     }
-    override def collectNames (names :Builder[String,_]) {
+    override def collectNames (names :Set.Builder[String]) {
       name.foreach(names += _)
       names ++= captures.map(_._2)
     }
@@ -77,7 +76,7 @@ object Rule {
         patterns.foreach(_.print(pw))
       }
     }
-    override def collectNames (names :Builder[String,_]) {
+    override def collectNames (names :Set.Builder[String]) {
       name.foreach(names += _)
       contentName.foreach(names += _)
       names ++= beginCaptures.map(_._2)

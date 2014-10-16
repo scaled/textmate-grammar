@@ -4,9 +4,9 @@
 
 package scaled.grammar
 
-import java.io.{File, InputStream}
-import scala.collection.convert.WrapAsScala._
 import com.dd.plist._
+import java.io.{File, InputStream}
+import scaled._
 
 private object PlistGrammar {
 
@@ -22,9 +22,9 @@ private object PlistGrammar {
 
     // val fileTypes = rootDict.objectForKey("fileTypes")
     new Grammar(name, scopeName, foldStart, foldStop) {
-      val repository = Map() ++ dictFor(rootDict, "repository").getHashMap flatMap {
+      val repository = Map((dictFor(rootDict, "repository").getHashMap.toMapV.flatMap {
         case (k, v) => parseRule(v).map(vr => (k -> vr))
-      }
+      }))
       val patterns = parseRules(rootDict)
     }
   }
@@ -42,13 +42,13 @@ private object PlistGrammar {
     case _ => new NSArray()
   }
 
-  def parseCaptures (dict :NSDictionary) = List() ++ dict flatMap {
+  def parseCaptures (dict :NSDictionary) = List() ++ dict.toMapV flatMap {
     case (group, vdict :NSDictionary) => Some(group.toInt -> stringFor(vdict, "name").get)
     case _ => None
   }
 
   def parseRules (dict :NSDictionary) :List[Rule] =
-    List() ++ arrayFor(dict, "patterns").getArray.flatMap(parseRule)
+    List.from(arrayFor(dict, "patterns").getArray).flatMap(parseRule)
 
   def parseRule (data :NSObject) :Option[Rule] = try {
     val dict = data.asInstanceOf[NSDictionary]

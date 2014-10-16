@@ -27,7 +27,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
 
   /** Handles applying the grammars to the buffer and computing scopes. */
   val scoper = {
-    val procs = List.newBuilder[Selector.Processor]
+    val procs = List.builder[Selector.Processor]()
     if (!effacers.isEmpty) procs += new Selector.Processor(effacers) {
       override def onBeforeLine (buf :Buffer, row :Int) { // clear any code styles
         val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
@@ -39,7 +39,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
         buf.setSyntax(Syntax.Default, start, end) // reset syntax
       }
     }
-    new Scoper(grammars, buffer, procs.result)
+    new Scoper(grammars, buffer, procs.build())
   }
 
   override def configDefs = GrammarConfig :: super.configDefs

@@ -6,7 +6,7 @@ package scaled.grammar
 
 import java.util.regex.{Pattern => JPattern, Matcher => JMatcher}
 import scala.annotation.tailrec
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.immutable.{Set => SSet}
 import scaled._
 
 /** Represents a matched span of text on a line.
@@ -40,10 +40,10 @@ object Matcher {
   class State (var matchers :List[Matcher], var scopes :List[String]) extends Cloneable {
 
     /** The spans matched on this line. */
-    val spans = ArrayBuffer[Span]()
+    val spans = SeqBuffer[Span]()
 
     /** A set of matchers to be skipped because they loop. */
-    var skips = Set[Matcher]()
+    var skips = SSet[Matcher]()
 
     /** Continues matching with `line` (which should be the line immediately following ours). This
       * state serves as the starting point and a new state is returned which represents the state
@@ -76,7 +76,7 @@ object Matcher {
 
     def onMatch (didAdvance :Boolean) {
       // if we advanced the scan position, clear the skipped matchers set
-      if (didAdvance && !skips.isEmpty) skips = Set()
+      if (didAdvance && !skips.isEmpty) skips = SSet()
     }
 
     def pushScope (pos :Int, scope :String) :Unit = {
@@ -138,7 +138,7 @@ object Matcher {
         def push () = state.pushScope(start, name)
         def pop () = state.popScope(end, name)
       }
-      val ms = new ArrayBuffer[Match](captures.size)
+      val ms = new SeqBuffer[Match](captures.size)
       var cs = captures ; while (!cs.isEmpty) {
         val group = cs.head._1 ; val name = cs.head._2
         try {

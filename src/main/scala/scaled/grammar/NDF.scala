@@ -9,7 +9,7 @@ import com.google.common.io.CharStreams
 import java.io.{InputStream, InputStreamReader, PrintStream}
 import java.nio.file.{Files, Path}
 import scala.annotation.tailrec
-import scala.collection.mutable.{Builder, ListBuffer}
+import scaled._
 
 /** Provides a simple nested dictionaries format for grammars. */
 object NDF {
@@ -71,11 +71,11 @@ object NDF {
 
   /** Parses `lines` into a nested dictionary. */
   def read (lines :List[String]) :Seq[Entry] = {
-    @tailrec def unbreak (ls :List[String], acc :ListBuffer[String]) :List[String] = ls match {
-      case Nil => acc.toList
+    @tailrec def unbreak (ls :List[String], acc :List.Builder[String]) :List[String] = ls match {
+      case Nil => acc.build()
       case h :: t =>
         def merge (l1 :String, l2 :String) = l1.dropRight(1) + "\n" + l2
-        if (t.isEmpty) { acc += h ; acc.toList }
+        if (t.isEmpty) { acc += h ; acc.build() }
         else if (h endsWith "\\") unbreak(merge(h, t.head) :: t.tail, acc)
         else { acc += h ; unbreak(t, acc) }
     }
@@ -87,7 +87,7 @@ object NDF {
         else if (line.charAt(ii+1) != ' ') Array(line) // invalid
         else Array(key, line.substring(ii+2))
     }
-    def read (lns :List[String], acc :Builder[Entry,_], pre :String) :List[String] = lns match {
+    def read (lns :List[String], acc :Seq.Builder[Entry], pre :String) :List[String] = lns match {
       case Nil => Nil
       case h :: t if (!h.startsWith(pre)) => lns
       case line :: rest => read(split(line, pre) match {
@@ -96,9 +96,9 @@ object NDF {
             acc += StrEnt(key, value)
             rest
           } else {
-            val nacc = Seq.newBuilder[Entry]
+            val nacc = Seq.builder[Entry]
             try read(rest, nacc, pre + " ")
-            finally acc += DicEnt(key, nacc.result)
+            finally acc += DicEnt(key, nacc.build())
           }
         case s =>
           // complain and skip this line
@@ -106,8 +106,8 @@ object NDF {
           rest
       }, acc, pre)
     }
-    val acc = Seq.newBuilder[Entry]
-    read(unbreak(lines.filterNot(_.trim.startsWith("#")), ListBuffer[String]()), acc, "")
-    acc.result
+    val acc = Seq.builder[Entry]()
+    read(unbreak(lines.filterNot(_.trim.startsWith("#")), List.builder[String]()), acc, "")
+    acc.build()
   }
 }

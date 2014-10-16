@@ -6,6 +6,7 @@ package scaled.grammar
 
 import java.io.InputStream
 import java.nio.file.Path
+import scaled._
 
 object NDFGrammar {
   import NDF._
@@ -15,28 +16,28 @@ object NDFGrammar {
 
   def toGrammar (root :Seq[Entry]) :Grammar = {
     val (strs, dicts) = toMaps(root)
-    val name = strs.getOrElse("name", "unknown:name")
-    val scopeName = strs.getOrElse("scopeName", "unknown:scopeName")
+    val name = strs.get("name") || "unknown:name"
+    val scopeName = strs.get("scopeName") || "unknown:scopeName"
     val foldStart = strs.get("foldStart")
     val foldStop  = strs.get("foldStop")
 
     // val fileTypes = rootDict.objectForKey("fileTypes")
     new Grammar(name, scopeName, foldStart, foldStop) {
-      val repository = Map() ++ dicts.getOrElse("repository", Seq()).flatMap {
+      val repository = Map((dicts.get("repository") || Seq()).flatMap {
         case DicEnt(k, v) => Some(k -> new Rule.Container(v.flatMap(parseRule).toList))
         case e @ StrEnt(k, v) => println("Invalid repository entry: $e") ; None
-      }
+      })
       val patterns = parseRules(dicts)
     }
   }
 
   def toMaps (es :Seq[Entry]) :(Map[String,String],Map[String,Seq[Entry]]) = {
-    val (strs, dicts) = (Map.newBuilder[String,String], Map.newBuilder[String,Seq[Entry]])
+    val (strs, dicts) = (Map.builder[String,String](), Map.builder[String,Seq[Entry]]())
     es foreach {
       case StrEnt(k, v)  => strs += (k -> v)
       case DicEnt(k, vs) => dicts += (k -> vs)
     }
-    (strs.result, dicts.result)
+    (strs.build(), dicts.build())
   }
 
   def parseCaptures (str :String) = {
@@ -44,12 +45,12 @@ object NDFGrammar {
       case -1 => println(s"Invalid capture: '$cap'") ; None
       case ii => Some(cap.substring(0, ii).toInt -> cap.substring(ii+1))
     }
-    str.split("\\s+").flatMap(parse).toList
+    List.from(str.split("\\s+")).flatMap(parse)
   }
   def parseCaptures (str :Option[String]) :List[(Int,String)] = str.map(parseCaptures).getOrElse(List())
 
   def parseRules (dict :Map[String,Seq[Entry]]) :List[Rule] =
-    dict.getOrElse("patterns", List()).flatMap(parseRule).toList
+    (dict.get("patterns") || List()).flatMap(parseRule).toList
 
   def parseRule (data :Entry) :Option[Rule] = try data match {
     case StrEnt("include", target) => Some(new Rule.Include(target))
