@@ -148,7 +148,7 @@ class GrammarTest {
 
   @Test def testJavaDocMatch () {
     val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(Seq(javaDoc), buffer, Nil)
+    val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil)
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 8)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 9)))
@@ -166,7 +166,7 @@ class GrammarTest {
 
   def smallTestBits () = {
     val buffer = testBuffer("Test.java", smallTestCode)
-    val scoper = new Scoper(Seq(javaDoc), buffer, Nil)
+    val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil)
     // do some precondition tests
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 14)))
@@ -229,7 +229,7 @@ class GrammarTest {
   @Test def testParse () {
     val javaDoc = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
     val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
-    val grammars = Seq(Grammar.parsePlist(javaDoc), Grammar.parsePlist(java))
+    val grammars = Grammar.Set(Grammar.parsePlist(javaDoc), Grammar.parsePlist(java))
     val buffer = testBuffer("Test.java", testJavaCode)
     val scoper = new Scoper(grammars, buffer, Nil)
     // println(scoper)

@@ -24,8 +24,7 @@ object NDFConfig extends Config.Defs {
     syntaxer("comment.line", Syntax.LineComment)
   )
 
-  def propsGrammar = Grammar.parseNDF(stream("NDF.ndf"))
-  lazy val grammars = Seq(propsGrammar)
+  val grammars = reloadable(Seq("NDF.ndf"))(Grammar.parseNDFs)
 }
 
 @Major(name="ndf",
@@ -35,7 +34,7 @@ object NDFConfig extends Config.Defs {
 class NDFMode (env :Env) extends GrammarCodeMode(env) {
 
   override def configDefs = NDFConfig :: super.configDefs
-  override def grammars = NDFConfig.grammars
+  override def grammars = NDFConfig.grammars.get
   override def effacers = NDFConfig.effacers
   override def syntaxers = NDFConfig.syntaxers
 

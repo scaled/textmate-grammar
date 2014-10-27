@@ -14,8 +14,8 @@ import scaled.code.CodeMode
 abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   import GrammarConfig._
 
-  /** Returns the grammars used by this mode. */
-  def grammars :Seq[Grammar]
+  /** Returns the grammar set used by this mode. */
+  def grammars :Grammar.Set
 
   /** Returns the effacers used to colorize code for this mode. Defaults to the empty list, which
     * indicates that the mode does not desire to colorize. */

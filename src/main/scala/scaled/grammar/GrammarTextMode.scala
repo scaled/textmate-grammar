@@ -14,8 +14,8 @@ import scaled.major.TextMode
 abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   import GrammarConfig._
 
-  /** Returns the grammars used by this mode. */
-  protected def grammars :Seq[Grammar]
+  /** Returns the grammar set used by this mode. */
+  protected def grammars :Grammar.Set
 
   /** Returns the effacers used to colorize code for this mode. Defaults to the empty list, which
     * indicates that the mode does not desire to colorize. */

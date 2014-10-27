@@ -81,26 +81,38 @@ object Grammar {
   import scala.collection.convert.WrapAsScala._
   import com.dd.plist._
 
-  /** Compiles `grammars` which are a set of inter-related grammars, and returns a matcher that can
-    * be used to apply the grammars to a buffer. The last grammar is presumed to be the main
-    * grammar for the mode and the other grammars are for languages which can be nested in the main
-    * grammar.
+  /** Compiles `grammars` which are a set of inter-related grammars into a matcher that can be used
+    * to apply the grammars to a buffer. The last grammar is presumed to be the main grammar for
+    * the mode and the other grammars are for languages which can be nested in the main grammar.
     */
-  def compile (grammars :Seq[Grammar]) :Matcher = {
-    val compilers = new HashMap[String,Compiler]()
-    grammars foreach { g => compilers += (g.scopeName -> new Compiler(compilers, g)) }
-    Matcher.first(compilers(grammars.last.scopeName).matchers)
+  case class Set (grammars :Seq[Grammar]) {
+    val matcher = {
+      val compilers = new HashMap[String,Compiler]()
+      grammars foreach { g => compilers += (g.scopeName -> new Compiler(compilers, g)) }
+      Matcher.first(compilers(grammars.last.scopeName).matchers)
+    }
+    def main :Grammar = grammars.last
   }
-
-  /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
-  def parsePlist (file :File) :Grammar = PlistGrammar.parse(file)
-  /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
-  def parsePlist (in :InputStream) :Grammar = PlistGrammar.parse(in)
+  object Set {
+    def apply (grammars :Grammar*) :Set = apply(Seq(grammars :_*))
+  }
 
   /** Parses a `tmLanguage` grammar file which should be in NDF format. */
   def parseNDF (file :Path) :Grammar = NDFGrammar.parse(file)
   /** Parses a `tmLanguage` grammar description which should be in NDF format. */
   def parseNDF (in :InputStream) :Grammar = NDFGrammar.parse(in)
+  /** Parses a list of `tmLanguage` grammar files in NDF format and creates a set.
+    * The last grammar must be the primary grammar. */
+  def parseNDFs (paths :Seq[Path]) :Grammar.Set = Grammar.Set(paths map parseNDF)
+
+  /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
+  def parsePlist (file :File) :Grammar = PlistGrammar.parse(file)
+  /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
+  def parsePlist (in :InputStream) :Grammar = PlistGrammar.parse(in)
+  /** Parses a list of `tmLanguage` grammar files in plist XML format and creates a set.
+    * The last grammar must be the primary grammar. */
+  def parsePlists (paths :Seq[Path]) :Grammar.Set =
+    Grammar.Set(paths map(p => parsePlist(p.toFile)))
 
   private class Compiler (compilers :HashMap[String,Compiler], grammar :Grammar) {
     val cache = new HashMap[String, List[Matcher]]()
