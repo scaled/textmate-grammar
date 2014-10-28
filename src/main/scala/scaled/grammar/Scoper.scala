@@ -55,9 +55,9 @@ class Scoper (gset :Grammar.Set, buf :RBuffer, procs :List[Selector.Processor]) 
 
     case Buffer.Delete(start, end, _) => // rethink the start row, delete nixed rows
       val srow = start.row ; val erow = end.row
-      val ostate = curState(erow) ; val nstate = rethink(srow)
+      val nstate = rethink(srow)
       setState(srow, nstate)
-      if (ostate nequiv nstate) cascadeRethink(srow+1)
+      cascadeRethink(srow+1)
 
     case Buffer.Transform(start, end, _) => // rethink all the transformed rows
       val erow = end.row ; var row = start.row
