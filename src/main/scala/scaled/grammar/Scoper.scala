@@ -65,10 +65,8 @@ class Scoper (gset :Grammar.Set, buf :RBuffer, procs :List[Selector.Processor]) 
       // TODO: we should trigger a cascade rethink if the last row state changed
   }}
 
-  private def curState (row :Int) :Matcher.State =
-    buf.lines(row).lineTag(classOf[Matcher.State], null)
-  private def setState (row :Int, state :Matcher.State) :Unit =
-    buf.setLineTag(classOf[Matcher.State], row, state)
+  private def curState (row :Int) :Matcher.State = buf.lines(row).lineTag(Matcher.NoState)
+  private def setState (row :Int, state :Matcher.State) :Unit = buf.setLineTag(row, state)
 
   private def rethink (row :Int) :Matcher.State = {
     // println(s"RETHINK $row ${buf.lines(row)}")

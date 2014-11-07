@@ -37,7 +37,8 @@ object Matcher {
   /** Used to match a single line and retain the matcher state at the end of the line.
     * @param matchers the current stack of active matchers.
     * @param scopes the current stack of active scopes. */
-  class State (var matchers :List[Matcher], var scopes :List[String]) extends Cloneable {
+  class State (var matchers :List[Matcher], var scopes :List[String])
+      extends Line.Tag with Cloneable {
 
     /** The spans matched on this line. */
     val spans = SeqBuffer[Span]()
@@ -121,6 +122,9 @@ object Matcher {
       this
     }
   }
+
+  /** A sentinel used to denote that a line's state has not yet been computed. */
+  val NoState = new State(Nil, Nil)
 
   /** Handles matching a pattern and applying a set of captures. */
   class Pattern (regexp :String, p :JPattern, captures :List[(Int,String)]) {
