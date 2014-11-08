@@ -38,7 +38,6 @@ class NDFMode (env :Env) extends GrammarCodeMode(env) {
   override def effacers = NDFConfig.effacers
   override def syntaxers = NDFConfig.syntaxers
 
-  override val indenters = Nil
   override val commenter = new Commenter() {
     override def linePrefix = "#"
   }
