@@ -61,13 +61,13 @@ private object PlistGrammar {
       new Rule.Include(include.get)
     } else if (begin.isDefined) {
       val caps = parseCaptures(dictFor(dict, "captures"))
-      val beginCaps = if (!dict.containsKey("beginCaptures")) caps else
-        parseCaptures(dictFor(dict, "beginCaptures"))
+      val beginCaps = if (!dict.containsKey("beginCaptures")) caps
+                      else parseCaptures(dictFor(dict, "beginCaptures"))
       val end = stringFor(dict, "end") getOrElse {
         throw new Exception(s"Rule missing end: $name ${`match`}")
       }
-      val endCaps = if (!dict.containsKey("endCaptures")) caps else
-        parseCaptures(dictFor(dict, "endCaptures"))
+      val endCaps = if (!dict.containsKey("endCaptures")) caps
+                    else parseCaptures(dictFor(dict, "endCaptures"))
       new Rule.Multi(begin.get, beginCaps, end, endCaps, name, stringFor(dict, "contentName"),
                      parseRules(dict))
     } else if (`match`.isDefined) {
