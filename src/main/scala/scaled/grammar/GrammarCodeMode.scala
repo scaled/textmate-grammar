@@ -44,7 +44,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
 
   override def configDefs = GrammarConfig :: super.configDefs
   override def keymap = super.keymap.
-    bind("M-A-p", "show-scopes") // TODO: also M-PI?
+    bind("show-scopes", "M-A-p") // TODO: also M-PI?
 
   @Fn("Displays the TextMate syntax scopes at the point.")
   def showScopes () {
