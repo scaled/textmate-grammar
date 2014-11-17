@@ -23,7 +23,7 @@ private object PlistGrammar {
     // val fileTypes = rootDict.objectForKey("fileTypes")
     new Grammar(name, scopeName, foldStart, foldStop) {
       val repository = Map((dictFor(rootDict, "repository").getHashMap.toMapV.flatMap {
-        case (k, v) => parseRule(v).map(vr => (k -> vr))
+        (k, v) => parseRule(v).map(vr => (k -> vr))
       }))
       val patterns = parseRules(rootDict)
     }
