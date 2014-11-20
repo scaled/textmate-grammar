@@ -59,13 +59,11 @@ object NDF {
 
   /** Reads the contents of `file`, which must be in NDF format. */
   def read (file :Path) :Seq[Entry] = {
-    import scala.collection.convert.WrapAsScala._
     read(List() ++ Files.readAllLines(file))
   }
 
   /** Reads the contents of `in`, which must be in NDF format. */
   def read (in :InputStream) :Seq[Entry] = {
-    import scala.collection.convert.WrapAsScala._
     read(List() ++ CharStreams.readLines(new InputStreamReader(in, Charsets.UTF_8)))
   }
 

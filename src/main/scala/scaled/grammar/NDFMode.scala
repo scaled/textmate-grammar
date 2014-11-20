@@ -24,7 +24,7 @@ object NDFConfig extends Config.Defs {
     syntaxer("comment.line", Syntax.LineComment)
   )
 
-  val grammars = reloadable(Seq("NDF.ndf"))(Grammar.parseNDFs)
+  val grammars = resource("NDF.ndf")(Grammar.parseNDFs)
 }
 
 @Major(name="ndf",

@@ -11,9 +11,6 @@ import scaled._
 object NDFGrammar {
   import NDF._
 
-  def parse (file :Path) = toGrammar(read(file))
-  def parse (in :InputStream) = toGrammar(read(in))
-
   def toGrammar (root :Seq[Entry]) :Grammar = {
     val (strs, dicts) = toMaps(root)
     val name = strs.get("name") || "unknown:name"

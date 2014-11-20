@@ -8,6 +8,7 @@ import java.io.{File, InputStream, PrintStream}
 import java.nio.file.Path
 import java.util.HashMap
 import scaled._
+import scaled.util.Resource
 
 /** Contains the data for a TextMate language grammar. Certain elements are omitted as they do not
   * map directly to the way Scaled handles languages. Generally one would create a language mode in
@@ -98,21 +99,19 @@ object Grammar {
   }
 
   /** Parses a `tmLanguage` grammar file which should be in NDF format. */
-  def parseNDF (file :Path) :Grammar = NDFGrammar.parse(file)
+  def parseNDF (file :Path) :Grammar = NDFGrammar.toGrammar(NDF.read(file))
   /** Parses a `tmLanguage` grammar description which should be in NDF format. */
-  def parseNDF (in :InputStream) :Grammar = NDFGrammar.parse(in)
-  /** Parses a list of `tmLanguage` grammar files in NDF format and creates a set.
-    * The last grammar must be the primary grammar. */
-  def parseNDFs (paths :Seq[Path]) :Grammar.Set = Grammar.Set(paths map parseNDF)
+  def parseNDF (in :InputStream) :Grammar = NDFGrammar.toGrammar(NDF.read(in))
+
+  /** Parses a Scaled resource containing a list of `tmLanguage` grammar files in NDF format and
+    * creates a set. The last grammar must be the primary grammar. */
+  val parseNDFs = (rsrc :Resource) => Grammar.Set(
+    rsrc.lines.map(lns => NDFGrammar.toGrammar(NDF.read(lns.toList))))
 
   /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
   def parsePlist (file :File) :Grammar = PlistGrammar.parse(file)
   /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
   def parsePlist (in :InputStream) :Grammar = PlistGrammar.parse(in)
-  /** Parses a list of `tmLanguage` grammar files in plist XML format and creates a set.
-    * The last grammar must be the primary grammar. */
-  def parsePlists (paths :Seq[Path]) :Grammar.Set =
-    Grammar.Set(paths map(p => parsePlist(p.toFile)))
 
   private class Compiler (compilers :HashMap[String,Compiler], grammar :Grammar) {
     val cache = new HashMap[String, List[Matcher]]()
