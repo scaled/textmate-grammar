@@ -7,5 +7,4 @@ license: New BSD
  scopts: -deprecation -feature
  depend: git:https://github.com/scaled/scaled.git#api
  depend: mvn:com.googlecode.plist:dd-plist:1.8
-testdep: mvn:junit:junit:4.11
-testdep: git:https://github.com/scaled/scaled.git#editor
+ module: test
