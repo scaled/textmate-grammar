@@ -39,7 +39,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
         buf.setSyntax(Syntax.Default, start, end) // reset syntax
       }
     }
-    new Scoper(grammars, buffer, procs.build()).connect(buffer, disp)
+    new Scoper(grammars, buffer, procs.build()).connect(buffer, disp.didInvoke)
   }
 
   override def configDefs = GrammarConfig :: super.configDefs
@@ -54,5 +54,5 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   }
 
   @Fn("Refreshes the colorization of the entire buffer.")
-  def refaceBuffer () :Unit = scoper.applyProcs()
+  def refaceBuffer () :Unit = scoper.rethinkBuffer()
 }

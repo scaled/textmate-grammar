@@ -29,7 +29,7 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
         if (start != end) buf.removeTags(classOf[String], textP, start, end)
       }
     })
-    new Scoper(grammars, buffer, procs).connect(buffer, disp)
+    new Scoper(grammars, buffer, procs).connect(buffer, disp.didInvoke)
   }
 
   override def configDefs = GrammarConfig :: super.configDefs
@@ -44,7 +44,5 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   }
 
   @Fn("Refreshes the colorization of the entire buffer.")
-  def refaceBuffer () {
-    scoper.applyProcs()
-  }
+  def refaceBuffer () :Unit = scoper.rethinkBuffer()
 }

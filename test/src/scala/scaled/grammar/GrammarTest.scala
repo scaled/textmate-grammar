@@ -149,6 +149,7 @@ class GrammarTest {
   @Test def testJavaDocMatch () {
     val buffer = testBuffer("Test.java", testJavaCode)
     val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil)
+    scoper.rethinkBuffer()
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 8)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 9)))
@@ -166,57 +167,64 @@ class GrammarTest {
 
   def smallTestBits () = {
     val buffer = testBuffer("Test.java", smallTestCode)
-    val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil)
+    val didEdit = Signal[String]()
+    val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil).connect(buffer, didEdit)
     // do some precondition tests
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 14)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 15)))
-    (buffer, scoper)
+    (buffer, didEdit, scoper)
   }
 
   @Test def testWordInsert () {
-    val (buffer, scoper) = smallTestBits()
+    val (buffer, didEdit, scoper) = smallTestBits()
     buffer.insert(Loc(3, 8), Line("blah "))
+    didEdit.emit("")
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 19)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 20)))
   }
 
   @Test def testNewlineInsert () {
-    val (buffer, scoper) = smallTestBits()
+    val (buffer, didEdit, scoper) = smallTestBits()
     buffer.insert(Loc(3, 0), Seq(Line(""), Line("")))
+    didEdit.emit("")
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 14)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 15)))
   }
 
   @Test def testRaggedInsert () {
-    val (buffer, scoper) = smallTestBits()
+    val (buffer, didEdit, scoper) = smallTestBits()
     buffer.insert(Loc(3, 0), Seq(Line(" "), Line(" ")))
+    didEdit.emit("")
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 15)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 16)))
   }
 
   @Test def testWordDelete () {
-    val (buffer, scoper) = smallTestBits()
+    val (buffer, didEdit, scoper) = smallTestBits()
     buffer.delete(Loc(3, 8), 5)
+    didEdit.emit("")
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 9)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 10)))
   }
 
   @Test def testNewlineDelete () {
-    val (buffer, scoper) = smallTestBits()
+    val (buffer, didEdit, scoper) = smallTestBits()
     buffer.delete(Loc(1, 0), Loc(2, 0))
+    didEdit.emit("")
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(1, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(2, 14)))
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(2, 15)))
   }
 
   @Test def testEnclosingDelete () {
-    val (buffer, scoper) = smallTestBits()
+    val (buffer, didEdit, scoper) = smallTestBits()
     buffer.delete(Loc(3, 13), Loc(3, 32))
+    didEdit.emit("")
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     val scopes = List("text.html.javadoc",
                       "comment.block.documentation.javadoc",
