@@ -54,7 +54,7 @@ class Scoper (gset :Grammar.Set, buf :RBuffer, procs :List[Selector.Processor]) 
       if (ostate nequiv nstate) cascadeRethink(row)
 
     case Buffer.Delete(start, end, _) => // rethink the start row, delete nixed rows
-      val srow = start.row ; val erow = end.row
+      val srow = start.row
       val nstate = rethink(srow)
       setState(srow, nstate)
       cascadeRethink(srow+1)

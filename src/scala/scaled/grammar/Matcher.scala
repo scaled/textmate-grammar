@@ -70,6 +70,9 @@ object Matcher {
     /** Returns true if this matcher is NOT equivalent to `other`. */
     def nequiv (other :State) :Boolean = matchers != other.matchers || scopes != other.scopes
 
+    // from Line.Tag; we don't want to be copied around
+    override def ephemeral = true
+
     override def toString = s"Matcher.State(matchers=${matchers.length}, " +
       s"scopes=${scopes.length}, spans=${spans.length}, skips=${skips.size})"
 
