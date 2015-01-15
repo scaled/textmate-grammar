@@ -39,7 +39,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
         buf.setSyntax(Syntax.Default, start, end) // reset syntax
       }
     }
-    new Scoper(grammars, buffer, procs.build())
+    new Scoper(grammars, buffer, procs.build()).connect(buffer, disp)
   }
 
   override def configDefs = GrammarConfig :: super.configDefs

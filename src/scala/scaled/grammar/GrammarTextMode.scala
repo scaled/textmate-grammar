@@ -29,7 +29,7 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
         if (start != end) buf.removeTags(classOf[String], textP, start, end)
       }
     })
-    new Scoper(grammars, buffer, procs)
+    new Scoper(grammars, buffer, procs).connect(buffer, disp)
   }
 
   override def configDefs = GrammarConfig :: super.configDefs

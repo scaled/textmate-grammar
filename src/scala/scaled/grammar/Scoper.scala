@@ -18,7 +18,7 @@ import scaled._
   * @param procs a list of processors that will be applied first to the whole buffer, then to any
   * parts of the buffer that are rescoped due to the buffer being edited.
   */
-class Scoper (gset :Grammar.Set, buf :RBuffer, procs :List[Selector.Processor]) {
+class Scoper (gset :Grammar.Set, buf :Buffer, procs :List[Selector.Processor]) {
 
   /** Returns the scope names applied to `loc` in outer- to inner-most order. */
   def scopesAt (loc :Loc) :List[String] = curState(loc.row).scopesAt(loc.col).reverse
@@ -35,35 +35,48 @@ class Scoper (gset :Grammar.Set, buf :RBuffer, procs :List[Selector.Processor]) 
     var row = 0; while (row < buf.lines.length) { curState(row).apply(procs, buf, row) ; row += 1 }
   }
 
+  /** Connects this scoper to `buf`, using `disp` to batch refacing. */
+  def connect (buf :RBuffer, disp :Dispatcher) :this.type = {
+    assert(this.buf eq buf)
+
+    // listen for changes to the buffer and note the region that needs rethinking
+    buf.edited.onValue { _ match {
+      case Buffer.Insert(start, end) =>
+        rethinkStart = math.min(rethinkStart, start.row)
+        rethinkEnd = math.max(rethinkEnd, end.row)
+      case Buffer.Delete(start, end, _) =>
+        rethinkStart = math.min(rethinkStart, start.row)
+        rethinkEnd = math.max(rethinkEnd, start.row)
+      case Buffer.Transform(start, end, _) =>
+        rethinkStart = math.min(rethinkStart, start.row)
+        rethinkEnd = math.max(rethinkEnd, end.row)
+    }}
+
+    // when a fn completes, rethink any changes we noted during edit notifications
+    disp.didInvoke.onValue { fn =>
+      if (rethinkEnd >= rethinkStart) {
+        var row = rethinkStart ; val end = rethinkEnd
+        while (row <= end) { setState(row, rethink(row)) ; row += 1 }
+        cascadeRethink(row)
+        rethinkStart = Int.MaxValue
+        rethinkEnd = -1
+      }
+    }
+
+    // compute states for all of the starting rows (TODO: turn this into something that happens
+    // lazily the first time a line is made visible...)
+    cascadeRethink(0)
+
+    this
+  }
+
   override def toString = s"Scoper(${gset.grammars}, $buf)"
 
   private val topMatcher = gset.matcher
   private val topState = new Matcher.State(List(topMatcher), List(gset.main.scopeName))
 
-  // compute states for all of the starting rows
-  cascadeRethink(0)
-
-  // listen for changes to the buffer and keep things up to date
-  buf.edited.onValue { _ match {
-    case Buffer.Insert(start, end) => // rethink the start row, insert (and think) any new rows
-      val srow = start.row ; val erow = end.row
-      val ostate = curState(srow) ; val nstate = rethink(srow)
-      setState(srow, nstate)
-      var row = srow+1 ; while (row <= erow) { setState(row, rethink(row)) ; row += 1 }
-      // rethink the line following the insert if the insert changed its start state
-      if (ostate nequiv nstate) cascadeRethink(row)
-
-    case Buffer.Delete(start, end, _) => // rethink the start row, delete nixed rows
-      val srow = start.row
-      val nstate = rethink(srow)
-      setState(srow, nstate)
-      cascadeRethink(srow+1)
-
-    case Buffer.Transform(start, end, _) => // rethink all the transformed rows
-      val erow = end.row ; var row = start.row
-      while (row <= erow) { setState(row, rethink(row)) ; row += 1 }
-      // TODO: we should trigger a cascade rethink if the last row state changed
-  }}
+  private var rethinkStart = Int.MaxValue
+  private var rethinkEnd = -1
 
   private def curState (row :Int) :Matcher.State = buf.lines(row).lineTag(Matcher.NoState)
   private def setState (row :Int, state :Matcher.State) :Unit = buf.setLineTag(row, state)
