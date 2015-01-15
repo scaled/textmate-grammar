@@ -54,7 +54,5 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   }
 
   @Fn("Refreshes the colorization of the entire buffer.")
-  def refaceBuffer () {
-    scoper.applyProcs()
-  }
+  def refaceBuffer () :Unit = scoper.applyProcs()
 }
