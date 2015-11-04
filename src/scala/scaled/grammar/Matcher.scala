@@ -73,8 +73,8 @@ object Matcher {
     // from Line.Tag; we don't want to be copied around
     override def ephemeral = true
 
-    override def toString = s"Matcher.State(matchers=${matchers.length}, " +
-      s"scopes=${scopes.length}, spans=${spans.length}, skips=${skips.size})"
+    override def toString = s"Matcher.State(${matchers.head}/${matchers.length}, " +
+      s"scopes=${scopes.mkString(";")}, spans=${spans.length}, skips=${skips.size})"
 
     //
     // implementation details
