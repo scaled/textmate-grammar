@@ -79,15 +79,14 @@ object Selector {
       }
       // if any existing match subsumes us, then don't add ourselves;
       // contrarily if we subsume any existing matches, remove them
-      var ii = 0 ; val ll = _curmstrs.size ; while (ii < ll) {
+      var ii = 0 ; var ll = _curmstrs.size ; while (ii < ll) {
         val exmstr = _curmstrs(ii)
         // if it starts with us, then we're subsumed; abort abort!
         if (exmstr startsWith mstr) return
         // if we start with it, then it's subsumed
         if (mstr startsWith exmstr) {
-          _curfns.remove(ii)
-          _curmstrs.remove(ii)
-          ii -= 1
+          _curfns.remove(ii) ; _curmstrs.remove(ii)
+          ii -= 1 ; ll -= 1
         }
         ii += 1
       }
