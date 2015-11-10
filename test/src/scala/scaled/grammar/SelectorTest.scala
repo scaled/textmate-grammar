@@ -19,8 +19,14 @@ class SelectorTest {
                       "comment.block.documentation.javadoc")
 
     val sel1 = Selector.parse("keyword")
-    assertEquals(5, sel1.matchDepth(scopes))
-    val sel2 = Selector.parse("comment")
-    assertEquals(1, sel2.matchDepth(scopes))
+    sel1.checkMatch(scopes, null, (fn, mstr, depth) => {
+      assertEquals(5, depth)
+      assertEquals("keyword", mstr)
+    })
+    val sel2 = Selector.parse("comment.block")
+    sel2.checkMatch(scopes, null, (fn, mstr, depth) => {
+      assertEquals(1, depth)
+      assertEquals("comment.block", mstr)
+    })
   }
 }

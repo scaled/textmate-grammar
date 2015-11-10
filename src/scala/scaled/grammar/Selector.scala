@@ -5,18 +5,20 @@
 package scaled.grammar
 
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
 import scaled._
 
 /** Matches scopes. */
 abstract class Selector {
 
-  /** Returns the depth into the supplied scopes list at which this selector matches the supplied
-    * scope list, or -1 if it does not match.
-    * @param scopes a set of scopes in innermost to outermost order. */
-  def matchDepth (scopes :List[String]) :Int
+  /** Calls `onMatch` with `fn`, the matched scope and match depth if `this` matches `scopes`.
+    * @return true if onMatch was called, false otherwise. */
+  def checkMatch (scopes :List[String], fn :Selector.Fn, onMatch :Selector.OnMatchFn) :Boolean
 }
 
 object Selector {
+
+  type OnMatchFn = (Selector.Fn,String,Int) => Unit
 
   /** A hook that applies a fn to spans which match a scope selector. */
   abstract class Fn (val selector: Selector) {
@@ -35,23 +37,30 @@ object Selector {
       // nada by default
     }
 
+    // NOTE: the code in apply and addMatch is called a bajillion times per buffer (dozens of times
+    // on every span of every line in the entire buffer); so we go to great pains to avoid creating
+    // unnecessary garbage and generally to be as efficient as possible; hence all the mutable
+    // variables and manual for loops (thanks for making that painful Scala)
+
     /** Applies this processor to the `span` on `row` in `buf`. */
     def apply (buf :Buffer, row :Int, span :Span) {
-      @inline @tailrec def maxMatches (sels :List[Fn], depth :Int, matches :List[Fn]) :List[Fn] = {
-        // TODO: revamp this to be more efficient
-        if (sels.isEmpty) matches
-        else {
-          val d = sels.head.selector.matchDepth(span.scopes)
-          if (d > depth) maxMatches(sels.tail, d, sels.head :: Nil)
-          else if (d == depth) maxMatches(sels.tail, d, sels.head :: matches)
-          else maxMatches(sels.tail, depth, matches)
-        }
-      }
       val start = Loc(row, span.start) ; val end = Loc(row, span.end)
-      var fns = maxMatches(sels, 0, Nil)
-      if (fns.isEmpty) onUnmatched(buf, start, end)
-      else while (!fns.isEmpty) {
-        fns.head(buf, start, end) ; fns = fns.tail
+      // check all of our selectors and accumulate all of them that match (the addMatch fn below
+      // will handle keeping the most specific matches based on match depth and matched scope
+      // prefix length)
+      var ss = sels ; while (!ss.isEmpty) {
+        ss.head.selector.checkMatch(span.scopes, ss.head, addMatchFn)
+        ss = ss.tail
+      }
+      // if we have no matches, let the processor do special "unmatched" processing
+      if (_curfns.isEmpty) onUnmatched(buf, start, end)
+      // otherwise go through and apply all of the matched styling fns
+      else {
+        var ii = 0 ; val ll = _curfns.size
+        while (ii < ll) { _curfns(ii).apply(buf, start, end) ; ii += 1 }
+        _curdepth = -1
+        _curfns.clear()
+        _curmstrs.clear()
       }
     }
 
@@ -60,6 +69,36 @@ object Selector {
       */
     protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
     }
+
+    private def addMatch (fn :Fn, mstr :String, mdepth :Int) {
+      // if our depth is greater than the existing matches, clear them out and add ourself
+      if (mdepth > _curdepth) {
+        _curfns.clear()
+        _curmstrs.clear()
+        _curdepth = mdepth
+      }
+      // if any existing match subsumes us, then don't add ourselves;
+      // contrarily if we subsume any existing matches, remove them
+      var ii = 0 ; val ll = _curmstrs.size ; while (ii < ll) {
+        val exmstr = _curmstrs(ii)
+        // if it starts with us, then we're subsumed; abort abort!
+        if (exmstr startsWith mstr) return
+        // if we start with it, then it's subsumed
+        if (mstr startsWith exmstr) {
+          _curfns.remove(ii)
+          _curmstrs.remove(ii)
+          ii -= 1
+        }
+        ii += 1
+      }
+      _curfns += fn
+      _curmstrs += mstr
+    }
+
+    private val _curfns = ArrayBuffer[Fn]()
+    private val _curmstrs = ArrayBuffer[String]()
+    private var _curdepth = -1
+    private[this] val addMatchFn = addMatch(_, _, _)
   }
 
   /** Parses a selector description.
@@ -76,32 +115,43 @@ object Selector {
   }
 
   private class Any (sels :List[Selector]) extends Selector {
-    def matchDepth (scopes :List[String]) = {
-      @tailrec @inline def loop (ss :List[Selector], max :Int) :Int =
-        if (ss.isEmpty) max
-        else loop(ss.tail, math.max(max, ss.head.matchDepth(scopes)))
-      loop(sels, -1)
+    override def checkMatch (scopes :List[String], fn :Fn, onMatch :OnMatchFn) = {
+      var matched = false
+      var ss = sels ; while (!ss.isEmpty) {
+        if (ss.head.checkMatch(scopes, fn, onMatch)) matched = true
+        ss = ss.tail
+      }
+      matched
     }
     override def toString = sels.mkString(", ")
   }
 
   private class Exclude (want :Selector, dontWant :Selector) extends Selector {
-    def matchDepth (scopes :List[String]) = {
-      val d = want.matchDepth(scopes)
-      if (dontWant.matchDepth(scopes) == -1) d else -1
+    override def checkMatch (scopes :List[String], fn :Fn, onMatch :OnMatchFn) = {
+      if (dontWant.checkMatch(scopes, fn, NoopOnMatch)) false
+      else want.checkMatch(scopes, fn, onMatch)
     }
     override def toString = s"$want - $dontWant"
   }
 
   private class Path (pres :List[String]) extends Selector {
-    def matchDepth (scopes :List[String]) = {
-      @tailrec @inline def loop (ss :List[String], ps :List[String], depth :Int) :Int =
-        if (ps.isEmpty) depth
-        else if (ss.isEmpty) -1
-        else if (!(ss.head startsWith ps.head)) loop(ss.tail, ps, depth)
-        else loop(ss.tail, ps.tail, if (depth == -1) ss.length else depth)
-      loop(scopes, pres, -1)
+    override def checkMatch (scopes :List[String], fn :Fn, onMatch :OnMatchFn) :Boolean = {
+      var ss = scopes ; var ps = pres ; var depth = -1
+      while (!ss.isEmpty && !ps.isEmpty) {
+        if (ss.head startsWith ps.head) {
+          if (depth == -1) depth = ss.length
+          if (ps.tail.isEmpty) {
+            onMatch(fn, ps.head, depth)
+            return true
+          }
+          ps = ps.tail
+        }
+        ss = ss.tail
+      }
+      false
     }
     override def toString = pres.reverse.mkString(" ")
   }
+
+  private val NoopOnMatch :OnMatchFn = (_, _, _) => {}
 }
