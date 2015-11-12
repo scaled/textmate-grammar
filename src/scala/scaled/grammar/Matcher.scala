@@ -201,7 +201,7 @@ object Matcher {
     else if (state.skips(ms.head)) applyFirst(ms.tail, state, line, start)
     else ms.head.apply(state, line, start) match {
       case  -1 => applyFirst(ms.tail, state, line, start)
-      case end => state.onMatch(start < end) ; end
+      case end => /*println(s"Match: ${ms.head} at $start");*/ state.onMatch(start < end) ; end
     }
 
   private def showAt (ms :List[Matcher], expand :Set[String], depth :Int) =
