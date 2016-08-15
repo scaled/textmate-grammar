@@ -71,8 +71,8 @@ object NDFGrammar {
 
   } catch {
     case e :Exception =>
-      println(s"Rule parse failure: $data")
-      e.printStackTrace(System.out)
+      System.err.println(s"Rule parse failure: $data")
+      e.printStackTrace(System.err)
       None
   }
 }

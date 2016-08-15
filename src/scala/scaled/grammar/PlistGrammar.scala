@@ -43,7 +43,12 @@ private object PlistGrammar {
   }
 
   def parseCaptures (dict :NSDictionary) = List() ++ dict.toMapV flatMap {
-    case (group, vdict :NSDictionary) => Some(group.toInt -> stringFor(vdict, "name").get)
+    case (group, vdict :NSDictionary) => stringFor(vdict, "name") match {
+      case Some(name) => Some(group.toInt -> name)
+      case None =>
+        System.err.println(s"Missing name for capture group $group: ${vdict.toXMLPropertyList}")
+        None
+    }
     case _ => None
   }
 
@@ -79,8 +84,8 @@ private object PlistGrammar {
 
   } catch {
     case e :Exception =>
-      println(s"Rule parse failure: $data")
-      e.printStackTrace(System.out)
+      System.err.println(s"Rule parse failure: ${data.toXMLPropertyList}")
+      e.printStackTrace(System.err)
       None
   }
 }

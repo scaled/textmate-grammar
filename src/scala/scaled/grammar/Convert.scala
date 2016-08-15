@@ -8,7 +8,7 @@ import java.io.File
 
 object Convert {
 
-  def main (args :Array[String]) {
+  def main (args :Array[String]) :Unit = try {
     if (args.isEmpty) {
       println("Usage: scaled.grammar.Convert file.tmLanguage");
       sys.exit(1)
@@ -16,5 +16,7 @@ object Convert {
 
     val grammar = PlistGrammar.parse(new File(args(0)))
     grammar.print(System.out)
+  } catch {
+    case e :Throwable => e.printStackTrace(System.err)
   }
 }
