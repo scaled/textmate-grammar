@@ -117,6 +117,7 @@ object Grammar {
     val cache = new HashMap[String, List[Matcher]]()
     val incFn = (_ :String) match {
       case "$self" => matchers
+      case "$base" => matchers
       case group if (group startsWith "#") => cache.get(group substring 1) match {
         case null => println(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
         case ms   => ms
