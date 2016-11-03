@@ -79,7 +79,6 @@ abstract class Grammar (
 }
 
 object Grammar {
-  import scala.collection.convert.WrapAsScala._
   import com.dd.plist._
 
   /** Compiles `grammars` which are a set of inter-related grammars into a matcher that can be used
@@ -89,8 +88,8 @@ object Grammar {
   case class Set (grammars :Seq[Grammar]) {
     val matcher = {
       val compilers = new HashMap[String,Compiler]()
-      grammars foreach { g => compilers += (g.scopeName -> new Compiler(compilers, g)) }
-      Matcher.first(compilers(grammars.last.scopeName).matchers)
+      grammars foreach { g => compilers.put(g.scopeName, new Compiler(compilers, g)) }
+      Matcher.first(compilers.get(grammars.last.scopeName).matchers)
     }
     def main :Grammar = grammars.last
   }
