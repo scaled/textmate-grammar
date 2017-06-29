@@ -37,14 +37,22 @@ object NDFGrammar {
     (strs.build(), dicts.build())
   }
 
-  def parseCaptures (str :String) = {
+  def parseInlineCaps (str :String) = {
     def parse (cap :String) = cap.indexOf("=") match {
       case -1 => println(s"Invalid capture: '$cap'") ; None
       case ii => Some(cap.substring(0, ii).toInt -> cap.substring(ii+1))
     }
     List.from(str.split("\\s+")).flatMap(parse)
   }
-  def parseCaptures (str :Option[String]) :List[(Int,String)] = str.map(parseCaptures).getOrElse(List())
+  def parseDictCaps (ents :Seq[Entry]) = ents.flatMap(ent => ent match {
+    case StrEnt(k, v) => Some(k.toInt -> v)
+    case DicEnt(k, vs) => println(s"Invalid capture: '$ent'") ; None
+  }).toList
+  def parseCaptures (
+    name :String, strs :Map[String,String], dicts :Map[String,Seq[Entry]],
+    defCaps :List[(Int,String)] = List()
+  ) :List[(Int,String)] =
+    strs.get(name).map(parseInlineCaps) orElse dicts.get(name).map(parseDictCaps) or defCaps
 
   def parseRules (dict :Map[String,Seq[Entry]]) :List[Rule] =
     (dict.get("patterns") || List()).flatMap(parseRule).toList
@@ -53,18 +61,18 @@ object NDFGrammar {
     case StrEnt("include", target) => Some(new Rule.Include(target))
     case DicEnt("single", rdata) =>
       val (strs, dicts) = toMaps(rdata)
-      Some(new Rule.Single(strs("pattern"), strs.get("name"), parseCaptures(strs.get("caps"))))
+      Some(new Rule.Single(strs("pattern"), strs.get("name"), parseCaptures("caps", strs, dicts)))
     case DicEnt("multi", rdata) =>
       val (strs, dicts) = toMaps(rdata)
       val begin = strs.get("begin") getOrElse {
         throw new Exception(s"Rule missing begin: $rdata")
       }
-      val caps = parseCaptures(strs.get("caps"))
-      val beginCaps = strs.get("bcaps").map(parseCaptures).getOrElse(caps)
+      val caps = parseCaptures("caps", strs, dicts)
+      val beginCaps = parseCaptures("bcaps", strs, dicts, caps)
       val end = strs.get("end") getOrElse {
         throw new Exception(s"Rule missing end: $rdata")
       }
-      val endCaps = strs.get("ecaps").map(parseCaptures).getOrElse(caps)
+      val endCaps = parseCaptures("ecaps", strs, dicts, caps)
       Some(new Rule.Multi(begin, beginCaps, end, endCaps, strs.get("name"),
                           strs.get("contentName"), parseRules(dicts)))
     case _ => println("Invalid rule data: $data") ; None
