@@ -5,8 +5,9 @@
 package scaled.grammar
 
 import com.google.common.base.Charsets
-import com.google.common.io.CharStreams
-import java.io.{InputStream, InputStreamReader, PrintStream}
+import com.google.common.io.Resources
+import java.io.{PrintStream}
+import java.net.URL
 import java.nio.file.{Files, Path}
 import scala.annotation.tailrec
 import scaled._
@@ -62,9 +63,9 @@ object NDF {
     read(List() ++ Files.readAllLines(file))
   }
 
-  /** Reads the contents of `in`, which must be in NDF format. */
-  def read (in :InputStream) :Seq[Entry] = {
-    read(List() ++ CharStreams.readLines(new InputStreamReader(in, Charsets.UTF_8)))
+  /** Reads the contents of `in`, which must be in NDF format. Closes `in` on completion. */
+  def read (url :URL) :Seq[Entry] = {
+    read(List() ++ Resources.readLines(url, Charsets.UTF_8))
   }
 
   /** Parses `lines` into a nested dictionary. */

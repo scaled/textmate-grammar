@@ -28,7 +28,7 @@ object Selector {
 
   /** A helper class for using a group of selectors to process a buffer. The canonical use is to use
     * a collection of selector to style mappings (i.e. a TextMate theme) to apply style classes to
-    * the approriate regions of the buffer.
+    * the appropriate regions of the buffer.
     */
   class Processor (sels :List[Fn]) {
 

@@ -5,10 +5,10 @@
 package scaled.grammar
 
 import java.io.{File, InputStream, PrintStream}
+import java.net.URL
 import java.nio.file.Path
 import java.util.HashMap
 import scaled._
-import scaled.util.Resource
 
 /** Contains the data for a TextMate language grammar. Certain elements are omitted as they do not
   * map directly to the way Scaled handles languages. Generally one would create a language mode in
@@ -81,52 +81,45 @@ abstract class Grammar (
 object Grammar {
   import com.dd.plist._
 
-  /** Compiles `grammars` which are a set of inter-related grammars into a matcher that can be used
-    * to apply the grammars to a buffer. The last grammar is presumed to be the main grammar for
-    * the mode and the other grammars are for languages which can be nested in the main grammar.
-    */
-  case class Set (grammars :Seq[Grammar]) {
-    val matcher = {
-      val compilers = new HashMap[String,Compiler]()
-      grammars foreach { g => compilers.put(g.scopeName, new Compiler(compilers, g)) }
-      Matcher.first(compilers.get(grammars.last.scopeName).matchers)
+  /** Used to compile grammars and resolve references to included grammars. */
+  class Compiler (val grammar :Grammar, log :Logger, lookup :String => Compiler) {
+    private val cache = new HashMap[String, List[Matcher]]()
+    private val incFn = (_ :String) match {
+      case "$self" => matchers
+      case "$base" => matchers
+      case group if (group startsWith "#") => cache.get(group substring 1) match {
+        case null => log.log(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
+        case ms   => ms
+      }
+      case lang => lookup(lang) match {
+        case null => log.log(s"Unknown include [grammar=${grammar.name}, lang=$lang]") ; Nil
+        case comp => comp.matchers
+      }
     }
-    def main :Grammar = grammars.last
-  }
-  object Set {
-    def apply (grammars :Grammar*) :Set = apply(Seq(grammars :_*))
+    grammar.repository foreach { (k, v) => cache.put(k, v.compile(incFn)) }
+
+    lazy val matchers :List[Matcher] = grammar.patterns.flatMap(_.compile(incFn))
   }
 
   /** Parses a `tmLanguage` grammar file which should be in NDF format. */
   def parseNDF (file :Path) :Grammar = NDFGrammar.toGrammar(NDF.read(file))
   /** Parses a `tmLanguage` grammar description which should be in NDF format. */
-  def parseNDF (in :InputStream) :Grammar = NDFGrammar.toGrammar(NDF.read(in))
-
-  /** Parses a Scaled resource containing a list of `tmLanguage` grammar files in NDF format and
-    * creates a set. The last grammar must be the primary grammar. */
-  val parseNDFs = (rsrc :Resource) => Grammar.Set(
-    rsrc.lines.map(lns => NDFGrammar.toGrammar(NDF.read(lns.toList))))
+  def parseNDF (url :URL) :Grammar = NDFGrammar.toGrammar(NDF.read(url))
 
   /** Parses a `tmLanguage` grammar file which should be in plist XML format. */
   def parsePlist (file :File) :Grammar = PlistGrammar.parse(file)
   /** Parses a `tmLanguage` grammar description, which should be in plist XML format. */
   def parsePlist (in :InputStream) :Grammar = PlistGrammar.parse(in)
 
-  private class Compiler (compilers :HashMap[String,Compiler], grammar :Grammar) {
-    val cache = new HashMap[String, List[Matcher]]()
-    val incFn = (_ :String) match {
-      case "$self" => matchers
-      case "$base" => matchers
-      case group if (group startsWith "#") => cache.get(group substring 1) match {
-        case null => println(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
-        case ms   => ms
-      }
-      case lang => compilers.get(lang) match {
-        case null => println(s"Unknown include [grammar=${grammar.name}, lang=$lang]") ; Nil
-        case comp => comp.matchers
-      }
+  /** Compiles a list of grammars and creates a scoper with them. For testing grammars. */
+  def testScoper (grammars :Seq[Grammar], buffer :Buffer, procs :List[Selector.Processor]) = {
+    val byScope = new HashMap[String, Grammar.Compiler]()
+    val log = new Logger() {
+      def log (msg :String) = println(msg)
+      def log (msg :String, exn :Throwable) { println(msg) ; exn.printStackTrace(System.err) }
     }
-    grammar.repository foreach { (k, v) => cache.put(k, v.compile(incFn)) }
-    lazy val matchers :List[Matcher] = grammar.patterns.flatMap(_.compile(incFn))
+    val comps = grammars.map(g => new Grammar.Compiler(g, log, byScope.get))
+    comps.foreach { c => byScope.put(c.grammar.scopeName, c) }
+    new Scoper(comps.last.grammar, Matcher.first(comps.last.matchers), buffer, procs)
   }
 }

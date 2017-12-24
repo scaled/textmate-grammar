@@ -8,17 +8,14 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scaled._
 
-/** Applies a set of grammars to an [[RBuffer]] to obtain an initial scoping of all text in the
-  * buffer. Then also listens for modifications to the buffer and updates the scopings to
-  * accommodate the changes.
-  *
-  * The last grammar in the list is considered to be the main grammar, the other grammars are
-  * presumed to be referenced by the main grammar as sub-languages.
+/** Applies a grammar (and any dependent grammars) to an [[RBuffer]] to obtain an initial scoping
+  * of all text in the buffer. Then also listens for modifications to the buffer and updates the
+  * scopings to accommodate the changes.
   *
   * @param procs a list of processors that will be applied first to the whole buffer, then to any
   * parts of the buffer that are rescoped due to the buffer being edited.
   */
-class Scoper (gset :Grammar.Set, buf :Buffer, procs :List[Selector.Processor]) {
+class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selector.Processor]) {
 
   /** Returns the scope names applied to `loc` in outer- to inner-most order. */
   def scopesAt (loc :Loc) :List[String] = curState(loc.row).scopesAt(loc.col).reverse
@@ -46,10 +43,10 @@ class Scoper (gset :Grammar.Set, buf :Buffer, procs :List[Selector.Processor]) {
     this
   }
 
-  override def toString = s"Scoper(${gset.grammars}, $buf)"
+  override def toString = s"Scoper(${grammar}, $buf)"
 
-  private val topMatcher = gset.matcher
-  private val topState = new Matcher.State(List(topMatcher), List(gset.main.scopeName))
+  private val topMatcher = matcher
+  private val topState = new Matcher.State(List(topMatcher), List(grammar.scopeName))
 
   private var rethinkStart = Int.MaxValue
   private var rethinkEnd = -1

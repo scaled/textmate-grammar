@@ -5,6 +5,7 @@
 package scaled.grammar
 
 import java.io.{File, StringReader}
+import java.util.HashMap
 import org.junit.Assert._
 import org.junit._
 import scaled._
@@ -146,9 +147,14 @@ class GrammarTest {
                           "meta.directive.literal.javadoc",
                           "keyword.other.documentation.directive.literal.javadoc")
 
+  val log = new Logger() {
+    def log (msg :String) = println(msg)
+    def log (msg :String, exn :Throwable) { println(msg) ; exn.printStackTrace(System.err) }
+  }
+
   @Test def testJavaDocMatch () {
     val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil)
+    val scoper = Grammar.testScoper(Seq(javaDoc), buffer, Nil)
     scoper.rethinkBuffer()
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(4, 8)))
@@ -168,7 +174,7 @@ class GrammarTest {
   def smallTestBits () = {
     val buffer = testBuffer("Test.java", smallTestCode)
     val didEdit = Signal[String]()
-    val scoper = new Scoper(Grammar.Set(javaDoc), buffer, Nil).connect(buffer, didEdit)
+    val scoper = Grammar.testScoper(Seq(javaDoc), buffer, Nil).connect(buffer, didEdit)
     // do some precondition tests
     assertScopesEqual(commentStart, scoper.scopesAt(Loc(2, 0)))
     assertScopesEqual(literalAt, scoper.scopesAt(Loc(3, 14)))
@@ -235,11 +241,12 @@ class GrammarTest {
   }
 
   @Test def testParse () {
-    val javaDoc = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
-    val java = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
-    val grammars = Grammar.Set(Grammar.parsePlist(javaDoc), Grammar.parsePlist(java))
+    val javaDocP = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
+    val javaP = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
+    val javaDoc = Grammar.parsePlist(javaDocP)
+    val java = Grammar.parsePlist(javaP)
     val buffer = testBuffer("Test.java", testJavaCode)
-    val scoper = new Scoper(grammars, buffer, Nil)
+    val scoper = Grammar.testScoper(Seq(javaDoc, java), buffer, Nil)
     // println(scoper)
   }
 

@@ -12,37 +12,27 @@ import scaled.code.CodeMode
   * extend this class rather than [[CodeMode]].
   */
 abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
-  import GrammarConfig._
 
-  /** Returns the grammar set used by this mode. */
-  def grammars :Grammar.Set
-
-  /** Returns the effacers used to colorize code for this mode. Defaults to the empty list, which
-    * indicates that the mode does not desire to colorize. */
-  def effacers :List[Selector.Fn] = Nil
-
-  /** Returns the syntaxers used to assign syntax for this mode. Defaults to the empty list, which
-    * indicates that the mode does not desire to syntax. */
-  def syntaxers :List[Selector.Fn] = Nil
+  /** The TextMate scope of the language grammar for this mode. */
+  def langScope :String
 
   /** Handles applying the grammars to the buffer and computing scopes. */
-  val scoper = {
+  val scoper = env.msvc.service[GrammarService].scoper(buffer, langScope, plugin => {
     val procs = List.builder[Selector.Processor]()
-    if (!effacers.isEmpty) procs += new Selector.Processor(effacers) {
+    if (!plugin.effacers.isEmpty) procs += new Selector.Processor(plugin.effacers) {
       override def onBeforeLine (buf :Buffer, row :Int) { // clear any code styles
         val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
-        if (start != end) buf.removeTags(classOf[String], codeP, start, end)
+        if (start != end) buf.removeTags(classOf[String], (_ :String) startsWith "code", start, end)
       }
     }
-    if (!syntaxers.isEmpty) procs += new Selector.Processor(syntaxers) {
+    if (!plugin.syntaxers.isEmpty) procs += new Selector.Processor(plugin.syntaxers) {
       override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
         buf.setSyntax(Syntax.Default, start, end) // reset syntax
       }
     }
-    new Scoper(grammars, buffer, procs.build()).connect(buffer, disp.didInvoke)
-  }
+    procs.build()
+  }).connect(buffer, disp.didInvoke)
 
-  override def configDefs = GrammarConfig :: super.configDefs
   override def keymap = super.keymap.
     bind("show-scopes", "M-A-p") // TODO: also M-PI?
 

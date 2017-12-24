@@ -12,27 +12,20 @@ import scaled.major.TextMode
   * purposes should extend this class rather than [[TextMode]].
   */
 abstract class GrammarTextMode (env :Env) extends TextMode(env) {
-  import GrammarConfig._
 
-  /** Returns the grammar set used by this mode. */
-  protected def grammars :Grammar.Set
-
-  /** Returns the effacers used to colorize code for this mode. Defaults to the empty list, which
-    * indicates that the mode does not desire to colorize. */
-  protected def effacers :List[Selector.Fn] = Nil
+  /** The TextMate scope of the language grammar for this mode. */
+  def langScope :String
 
   /** Handles applying the grammars to the buffer and computing scopes. */
-  val scoper = {
-    val procs = if (effacers.isEmpty) Nil else List(new Selector.Processor(effacers) {
+  val scoper = env.msvc.service[GrammarService].scoper(buffer, langScope, plugin => {
+    if (plugin.effacers.isEmpty) Nil else List(new Selector.Processor(plugin.effacers) {
       override def onBeforeLine (buf :Buffer, row :Int) { // clear any text styles
         val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
-        if (start != end) buf.removeTags(classOf[String], textP, start, end)
+        if (start != end) buf.removeTags(classOf[String], (_ :String) startsWith "text", start, end)
       }
     })
-    new Scoper(grammars, buffer, procs).connect(buffer, disp.didInvoke)
-  }
+  }).connect(buffer, disp.didInvoke)
 
-  override def configDefs = GrammarConfig :: super.configDefs
   override def keymap = super.keymap.
     bind("show-syntax", "M-A-p"); // TODO: also M-PI?
 
