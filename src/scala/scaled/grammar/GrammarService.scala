@@ -13,8 +13,13 @@ trait GrammarService {
   /** Returns the grammar for `langScope`, if one is available. */
   def grammar (langScope :String) :Option[Grammar]
 
+  /** Creates a [[Scoper]] for `buffer` using `langScope` to identify the main grammar. */
+  def scoper (buffer :Buffer, langScope :String) :Scoper =
+    scoper(buffer, langScope, plugin => List(plugin.effacers, plugin.syntaxers).
+      flatMap(sels => if (sels.isEmpty) None else Some(new Selector.Processor(sels))))
+
   /** Creates a [[Scoper]] for `buffer` using `langScope` to identify the main grammar.
-    * @param mkProcs a function that creates the line processors given the plugin metadata. */
-  def scoper (buffer :RBuffer, langScope :String,
+    * @param mkProcs a function to create custom line processors given the plugin metadata. */
+  def scoper (buffer :Buffer, langScope :String,
               mkProcs :GrammarPlugin => List[Selector.Processor]) :Scoper
 }

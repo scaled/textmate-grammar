@@ -36,7 +36,7 @@ class GrammarManager (
   override def grammar (langScope :String) :Option[Grammar] =
     Option(compiler(langScope)).map(_.grammar)
 
-  override def scoper (buffer :RBuffer, langScope :String,
+  override def scoper (buffer :Buffer, langScope :String,
                        mkProcs :GrammarPlugin => List[Selector.Processor]) :Scoper = {
     val plugin = Option(plugins.get(langScope)) || {
       throw Errors.feedback(s"No grammar available for '$langScope'") }
