@@ -84,21 +84,29 @@ object Grammar {
   /** Used to compile grammars and resolve references to included grammars. */
   class Compiler (val grammar :Grammar, log :Logger, lookup :String => Compiler) {
     private val cache = new HashMap[String, List[Matcher]]()
-    private val incFn = (_ :String) match {
+    grammar.repository foreach { (k, v) => cache.put(k, v.compile(include)) }
+    private def langPart (ref :String) = ref.indexOf('#') match {
+      case -1 => ref
+      case ii => ref.substring(0, ii)
+    }
+
+    lazy val matchers :List[Matcher] = grammar.patterns.flatMap(_.compile(include))
+
+    def include (ref :String) :List[Matcher] = ref match {
       case "$self" => matchers
       case "$base" => matchers
       case group if (group startsWith "#") => cache.get(group substring 1) match {
         case null => log.log(s"Unknown include [grammar=${grammar.name}, group=$group]") ; Nil
         case ms   => ms
       }
-      case lang => lookup(lang) match {
+      case lang => lookup(langPart(lang)) match {
         case null => log.log(s"Unknown include [grammar=${grammar.name}, lang=$lang]") ; Nil
-        case comp => comp.matchers
+        case comp => ref.indexOf('#') match {
+          case -1 => comp.matchers
+          case ii => comp.include(ref.substring(ii+1))
+        }
       }
     }
-    grammar.repository foreach { (k, v) => cache.put(k, v.compile(incFn)) }
-
-    lazy val matchers :List[Matcher] = grammar.patterns.flatMap(_.compile(incFn))
   }
 
   /** Parses a `tmLanguage` grammar file which should be in NDF format. */
