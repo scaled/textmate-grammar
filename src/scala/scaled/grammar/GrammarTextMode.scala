@@ -6,6 +6,7 @@ package scaled.grammar
 
 import scaled._
 import scaled.major.TextMode
+import scaled.util.Errors
 
 /** Extends [[TextMode]] with support for using TextMate grammars for code highlighting.
   * Non-code major modes which intend to use TextMate grammars for code highlighting and other
@@ -17,14 +18,9 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
   def langScope :String
 
   /** Handles applying the grammars to the buffer and computing scopes. */
-  val scoper = env.msvc.service[GrammarService].scoper(buffer, langScope, plugin => {
-    if (plugin.effacers.isEmpty) Nil else List(new Selector.Processor(plugin.effacers) {
-      override def onBeforeLine (buf :Buffer, row :Int) { // clear any text styles
-        val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
-        if (start != end) buf.removeTags(classOf[String], (_ :String) startsWith "text", start, end)
-      }
-    })
-  }).connect(buffer, disp.didInvoke)
+  val scoper = env.msvc.service[GrammarService].scoper(buffer, langScope, mkProcs).
+    getOrElse(throw Errors.feedback(s"No grammar available for '$langScope'")).
+    connect(buffer, disp.didInvoke)
 
   override def keymap = super.keymap.
     bind("show-syntax", "M-A-p"); // TODO: also M-PI?
@@ -38,4 +34,12 @@ abstract class GrammarTextMode (env :Env) extends TextMode(env) {
 
   @Fn("Refreshes the colorization of the entire buffer.")
   def refaceBuffer () :Unit = scoper.rethinkBuffer()
+
+  private def mkProcs (plugin :GrammarPlugin) =
+    if (plugin.effacers.isEmpty) Nil else List(new Selector.Processor(plugin.effacers) {
+      override def onBeforeLine (buf :Buffer, row :Int) { // clear any text styles
+        val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
+        if (start != end) buf.removeTags(classOf[String], (_ :String) startsWith "text", start, end)
+      }
+    })
 }

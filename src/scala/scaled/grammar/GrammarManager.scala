@@ -6,7 +6,6 @@ package scaled.grammar
 
 import java.util.HashMap
 import scaled._
-import scaled.util.Errors
 
 class GrammarManager (
   msvc :MetaService, psvc :PluginService
@@ -37,10 +36,7 @@ class GrammarManager (
     Option(compiler(langScope)).map(_.grammar)
 
   override def scoper (buffer :Buffer, langScope :String,
-                       mkProcs :GrammarPlugin => List[Selector.Processor]) :Scoper = {
-    val plugin = Option(plugins.get(langScope)) || {
-      throw Errors.feedback(s"No grammar available for '$langScope'") }
-    val comp = compiler(langScope)
-    new Scoper(comp.grammar, Matcher.first(comp.matchers), buffer, mkProcs(plugin))
-  }
+                       mkProcs :GrammarPlugin => List[Selector.Processor]) :Option[Scoper] =
+    for (plugin <- Option(plugins.get(langScope)) ; comp = compiler(langScope))
+    yield new Scoper(comp.grammar, Matcher.first(comp.matchers), buffer, mkProcs(plugin))
 }
