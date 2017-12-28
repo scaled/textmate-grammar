@@ -28,7 +28,10 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
   def showScopes (row :Int) :Seq[String] = curState(row).showScopes
 
   /** Re-matches and re-faces the entire buffer. */
-  def rethinkBuffer () :Unit = cascadeRethink(0, true)
+  def rethinkBuffer () :Unit = cascadeRethink(0, buf.lines.size, true)
+
+  /** Re-matches and re-faces the region from line `from` to line `to` (non-inclusive). */
+  def rethinkRegion (from :Int, to :Int) :Unit = cascadeRethink(from, to, true)
 
   /** Connects this scoper to `buf`, using `didInvoke` to batch refacing. */
   def connect (buf :RBuffer, didInvoke :SignalV[String]) :this.type = {
@@ -39,7 +42,7 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
     didInvoke.onEmit(processRethinks)
     // compute states for all of the starting rows (TODO: turn this into something that happens
     // lazily the first time a line is made visible...)
-    cascadeRethink(0, false)
+    cascadeRethink(0, buf.lines.size, false)
     this
   }
 
@@ -70,7 +73,7 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
     if (rethinkEnd >= rethinkStart) {
       var row = rethinkStart ; val end = rethinkEnd
       while (row <= end) { setState(row, rethink(row)) ; row += 1 }
-      cascadeRethink(row, false)
+      cascadeRethink(row, buf.lines.size, false)
       rethinkStart = Int.MaxValue
       rethinkEnd = -1
     }
@@ -85,11 +88,11 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
   }
 
   // rethinks row; if end of row state changed, rethinks the next row as well; &c
-  private def cascadeRethink (row :Int, force :Boolean) {
-    if (row < buf.lines.length) {
+  private def cascadeRethink (row :Int, stopRow :Int, force :Boolean) {
+    if (row < stopRow) {
       val ostate = curState(row) ; val nstate = rethink(row)
       setState(row, nstate)
-      if (ostate == null || force || (ostate nequiv nstate)) cascadeRethink(row+1, force)
+      if (ostate == null || force || (ostate nequiv nstate)) cascadeRethink(row+1, stopRow, force)
     }
   }
 }
