@@ -5,6 +5,7 @@
 package scaled.grammar
 
 import java.io.File
+import java.nio.file.Paths
 
 object Convert {
 
@@ -13,9 +14,11 @@ object Convert {
       println("Usage: scaled.grammar.Convert file.tmLanguage");
       sys.exit(1)
     }
-
-    val grammar = PlistGrammar.parse(new File(args(0)))
-    grammar.print(System.out)
+    args(0).substring(args(0).lastIndexOf(".")+1) match {
+      case "json" => JsonGrammar.parse(Paths.get(args(0))).print(System.out)
+      case "plist"|"tmLanguage" => PlistGrammar.parse(new File(args(0))).print(System.out)
+      case suff => println(s"Unknown file suffix '$suff'")
+    }
   } catch {
     case e :Throwable => e.printStackTrace(System.err)
   }

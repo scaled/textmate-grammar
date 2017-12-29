@@ -6,4 +6,5 @@ descrip: A library for making use of TextMate language grammars in Scaled.
 license: New BSD
  depend: git:https://github.com/scaled/scaled.git#api
  depend: mvn:com.googlecode.plist:dd-plist:1.8
+ depend: mvn:com.eclipsesource.minimal-json:minimal-json:0.9.4
  module: test
