@@ -47,8 +47,10 @@ object JsonGrammar {
   def parseSingle (obj :JsonObject) = obj.optString("match").map(
     m => Rule.Single(m, obj.optString("name"), parseCaps(obj.optValue("captures"))))
   def parseMulti (obj :JsonObject) = obj.optString("begin").map(
-    begin => Rule.Multi(begin, parseCaps(obj.optValue("beginCaptures")),
-                        obj.reqString("end"), parseCaps(obj.optValue("endCaptures")),
+    begin => Rule.Multi(begin,
+                        parseCaps(obj.optValue("beginCaptures") orElse obj.optValue("captures")),
+                        obj.reqString("end"),
+                        parseCaps(obj.optValue("endCaptures") orElse obj.optValue("captures")),
                         obj.optString("name"), None, // TODO: contentName?
                         parseRules(obj.get("patterns"))))
   def parseInclude (obj :JsonObject) = obj.optString("include").map(
