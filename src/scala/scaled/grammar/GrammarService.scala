@@ -13,6 +13,10 @@ trait GrammarService {
   /** Returns the grammar for `langScope`, if one is available. */
   def grammar (langScope :String) :Option[Grammar]
 
+  /** Removes any cached compiled grammar for `langScope`.
+    * Used to force reload of a grammar when debugging it during mode development. */
+  def resetGrammar (langScope :String) :Unit
+
   /** Creates a [[Scoper]] for `buffer` using `langScope` to identify the main grammar.
     * @return the scoper or `None` if no grammar is available for `langScope`. */
   def scoper (buffer :Buffer, langScope :String) :Option[Scoper] =

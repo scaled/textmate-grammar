@@ -35,6 +35,8 @@ class GrammarManager (
   override def grammar (langScope :String) :Option[Grammar] =
     Option(compiler(langScope)).map(_.grammar)
 
+  override def resetGrammar (langScope :String) :Unit = comps.remove(langScope)
+
   override def scoper (buffer :Buffer, langScope :String,
                        mkProcs :GrammarPlugin => List[Selector.Processor]) :Option[Scoper] =
     for (plugin <- Option(plugins.get(langScope)) ; comp = compiler(langScope))

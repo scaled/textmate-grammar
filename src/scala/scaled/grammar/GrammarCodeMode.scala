@@ -35,6 +35,12 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   @Fn("Refreshes the colorization of the entire buffer.")
   def refaceBuffer () :Unit = scoper.rethinkBuffer()
 
+  @Fn("Forces reload of our language grammar and reloads this buffer (to force a restyle).")
+  def reloadGrammar () :Unit = {
+    env.msvc.service[GrammarService].resetGrammar(langScope)
+    frame.revisitFile()
+  }
+
   private def mkProcs (plugin :GrammarPlugin) = {
     val procs = List.builder[Selector.Processor]()
     if (!plugin.effacers.isEmpty) procs += new Selector.Processor(plugin.effacers) {
