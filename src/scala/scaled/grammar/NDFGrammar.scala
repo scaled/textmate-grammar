@@ -75,7 +75,7 @@ object NDFGrammar {
       val endCaps = parseCaptures("ecaps", strs, dicts, caps)
       Some(new Rule.Multi(begin, beginCaps, end, endCaps, strs.get("name"),
                           strs.get("contentName"), parseRules(dicts)))
-    case _ => println("Invalid rule data: $data") ; None
+    case _ => println(s"Invalid rule data: $data") ; None
 
   } catch {
     case e :Exception =>
