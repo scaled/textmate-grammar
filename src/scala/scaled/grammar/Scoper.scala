@@ -28,10 +28,15 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
   def showScopes (row :Int) :Seq[String] = curState(row).showScopes
 
   /** Re-matches and re-faces the entire buffer. */
-  def rethinkBuffer () :Unit = cascadeRethink(0, buf.lines.size, true)
+  def rethinkBuffer () :Unit = cascadeRethink(0, buf.lines.size, 0, true)
 
   /** Re-matches and re-faces the region from line `from` to line `to` (non-inclusive). */
-  def rethinkRegion (from :Int, to :Int) :Unit = cascadeRethink(from, to, true)
+  def rethinkRegion (from :Int, to :Int) :Unit = cascadeRethink(from, to, 0, true)
+
+  /** Re-matches and re-faces the region from line `from` to line `to` (non-inclusive) as if it
+    * were the only contents of the buffer. The first line of the region is treated as having no
+    * inherited scoping state. Used for highlighting code embedded in Markdown, etc. */
+  def rethinkIsolatedRegion (from :Int, to :Int) :Unit = cascadeRethink(from, to, from, true)
 
   /** Connects this scoper to `buf`, using `didInvoke` to batch refacing. */
   def connect (buf :RBuffer, didInvoke :SignalV[String]) :this.type = {
@@ -42,7 +47,7 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
     didInvoke.onEmit(processRethinks)
     // compute states for all of the starting rows (TODO: turn this into something that happens
     // lazily the first time a line is made visible...)
-    cascadeRethink(0, buf.lines.size, false)
+    cascadeRethink(0, buf.lines.size, 0, false)
     this
   }
 
@@ -72,27 +77,34 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
   private def processRethinks () {
     if (rethinkEnd >= rethinkStart) {
       var row = rethinkStart ; val end = rethinkEnd
-      while (row <= end) { setState(row, rethink(row)) ; row += 1 }
-      cascadeRethink(row, buf.lines.size, false)
+      while (row <= end) { setState(row, rethink(row, 0)) ; row += 1 }
+      cascadeRethink(row, buf.lines.size, 0, false)
       rethinkStart = Int.MaxValue
       rethinkEnd = -1
     }
   }
 
-  private def rethink (row :Int) :Matcher.State = {
+  private def rethink (row :Int, firstRow :Int) :Matcher.State = {
     // println(s"RETHINK $row ${buf.lines(row)}")
-    val pstate = if (row == 0) topState else curState(row-1)
+    val pstate = if (row == firstRow) topState else curState(row-1)
     val state = pstate.continue(buf.lines(row))
     state.apply(procs, buf, row)
     state
   }
 
   // rethinks row; if end of row state changed, rethinks the next row as well; &c
-  private def cascadeRethink (row :Int, stopRow :Int, force :Boolean) {
+  private def cascadeRethink (row :Int, stopRow :Int, firstRow :Int, force :Boolean) {
     if (row < stopRow) {
-      val ostate = curState(row) ; val nstate = rethink(row)
-      setState(row, nstate)
-      if (ostate == null || force || (ostate nequiv nstate)) cascadeRethink(row+1, stopRow, force)
+      try {
+        val ostate = curState(row) ; val nstate = rethink(row, firstRow)
+        setState(row, nstate)
+        if (ostate == null || force || (ostate nequiv nstate)) cascadeRethink(
+          row+1, stopRow, firstRow, force)
+      } catch {
+        case ex :Exception =>
+          println(s"Cascade rethink died [row=$row, stop=$stopRow, first=$firstRow, force=$force]")
+          ex.printStackTrace()
+      }
     }
   }
 }
