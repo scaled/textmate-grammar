@@ -74,7 +74,7 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
       rethinkEnd = math.max(rethinkEnd, end.row)
   }
 
-  private def processRethinks () {
+  private def processRethinks () = try {
     if (rethinkEnd >= rethinkStart) {
       var row = rethinkStart ; val end = rethinkEnd
       while (row <= end) { setState(row, rethink(row, 0)) ; row += 1 }
@@ -82,6 +82,10 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
       rethinkStart = Int.MaxValue
       rethinkEnd = -1
     }
+  } catch {
+    case e :Throwable =>
+      println(s"Rethink choked (for $this)")
+      e.printStackTrace()
   }
 
   private def rethink (row :Int, firstRow :Int) :Matcher.State = {
