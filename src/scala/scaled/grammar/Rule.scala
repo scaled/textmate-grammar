@@ -6,6 +6,7 @@ package scaled.grammar
 
 import java.io.PrintStream
 import scaled._
+import scaled.grammar.Matcher
 
 /** Models a single TextMate grammar rule. Instead of having one giant intertwingled mess, we model
   * grammar rules with a variety of subclasses, each of which handles a particular common case.
@@ -21,7 +22,7 @@ abstract class Rule {
   def print (out :NDF.Writer, children :Boolean = true) :Unit
 
   /** Adds any scope names matched by this rule to `names`. */
-  def collectNames (names :Set.Builder[String]) {}
+  def collectNames (names :Set.Builder[String]) :Unit = {}
 }
 
 object Rule {
@@ -49,7 +50,7 @@ object Rule {
       w.emit("pattern", pattern)
       if (!captures.isEmpty) w.emit("caps", fmt(captures))
     }
-    override def collectNames (names :Set.Builder[String]) {
+    override def collectNames (names :Set.Builder[String]) :Unit = {
       name.foreach(names += _)
       names ++= captures.map(_._2)
     }
@@ -63,7 +64,7 @@ object Rule {
       new Matcher.Multi(Matcher.pattern(this, begin, beginCaptures),
                         Matcher.pattern(this, end, endCaptures),
                         name, contentName, patterns.flatMap(_.compile(incFn))))
-    override def print (out :NDF.Writer, children :Boolean) {
+    override def print (out :NDF.Writer, children :Boolean) :Unit = {
       val w = out.nest("multi")
       w.emit("name", name)
       w.emit("contentName", contentName)
@@ -76,7 +77,7 @@ object Rule {
         patterns.foreach(_.print(pw))
       }
     }
-    override def collectNames (names :Set.Builder[String]) {
+    override def collectNames (names :Set.Builder[String]) :Unit = {
       name.foreach(names += _)
       contentName.foreach(names += _)
       names ++= beginCaptures.map(_._2)

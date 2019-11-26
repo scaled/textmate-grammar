@@ -26,7 +26,7 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
     bind("show-scopes", "M-A-p") // TODO: also M-PI?
 
   @Fn("Displays the TextMate syntax scopes at the point.")
-  def showScopes () {
+  def showScopes () :Unit = {
     val ss = scoper.scopesAt(view.point())
     val text = if (ss.isEmpty) List("No scopes.") else ss
     view.popup() = Popup.text(text, Popup.UpRight(view.point()))
@@ -57,13 +57,13 @@ abstract class GrammarCodeMode (env :Env) extends CodeMode(env) {
   private def mkProcs (plugin :GrammarPlugin) = {
     val procs = List.builder[Selector.Processor]()
     if (!plugin.effacers.isEmpty) procs += new Selector.Processor(plugin.effacers) {
-      override def onBeforeLine (buf :Buffer, row :Int) { // clear any code styles
+      override def onBeforeLine (buf :Buffer, row :Int) :Unit = { // clear any code styles
         val start = buf.lineStart(row) ; val end = buf.lineEnd(row)
         if (start != end) buf.removeTags(classOf[String], isModeStyle, start, end)
       }
     }
     if (!plugin.syntaxers.isEmpty) procs += new Selector.Processor(plugin.syntaxers) {
-      override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
+      override protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) :Unit = {
         buf.setSyntax(Syntax.Default, start, end) // reset syntax
       }
     }

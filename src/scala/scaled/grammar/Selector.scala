@@ -33,7 +33,7 @@ object Selector {
   class Processor (sels :List[Fn]) {
 
     /** Called before applying this processor to any spans on `row` in `buf`. */
-    def onBeforeLine (buf :Buffer, row :Int) {
+    def onBeforeLine (buf :Buffer, row :Int) :Unit = {
       // nada by default
     }
 
@@ -43,7 +43,7 @@ object Selector {
     // variables and manual for loops (thanks for making that painful Scala)
 
     /** Applies this processor to the `span` on `row` in `buf`. */
-    def apply (buf :Buffer, row :Int, span :Span) {
+    def apply (buf :Buffer, row :Int, span :Span) :Unit = {
       val start = Loc(row, span.start) ; val end = Loc(row, span.end)
       // check all of our selectors and accumulate all of them that match (the addMatch fn below
       // will handle keeping the most specific matches based on match depth and matched scope
@@ -67,10 +67,10 @@ object Selector {
     /** Called for spans that did not match any of our supplied selectors. This is useful, for
       * example, for clearing styles from unmatched spans which may have previously matched.
       */
-    protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) {
+    protected def onUnmatched (buf :Buffer, start :Loc, end :Loc) :Unit = {
     }
 
-    private def addMatch (fn :Fn, mstr :String, mdepth :Int) {
+    private def addMatch (fn :Fn, mstr :String, mdepth :Int) :Unit = {
       // if our depth is greater than the existing matches, clear them out and add ourself
       if (mdepth > _curdepth) {
         _curfns.clear()

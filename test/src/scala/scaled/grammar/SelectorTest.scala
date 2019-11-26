@@ -10,7 +10,7 @@ import scaled._
 
 class SelectorTest {
 
-  @Test def testMatchDepth () {
+  @Test def testMatchDepth () :Unit = {
     val scopes = List("punctuation.definition.keyword.javadoc",
                       "keyword.other.documentation.directive.literal.javadoc",
                       "meta.directive.literal.javadoc",

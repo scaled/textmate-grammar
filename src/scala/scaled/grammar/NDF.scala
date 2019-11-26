@@ -21,12 +21,12 @@ object NDF {
     private def escape (text :String) = text.replace("\n", "\\\n")
 
     /** Emits the supplied key/value pair at the current depth. */
-    def emit (key :String, value :String) {
+    def emit (key :String, value :String) :Unit = {
       emitln(s"$key: ${escape(value)}")
     }
 
     /** Emits the supplied key/value pair iff `value` is defined. */
-    def emit (key :String, value :Option[String]) {
+    def emit (key :String, value :Option[String]) :Unit = {
       if (value.isDefined) emit(key, value.get)
     }
 
@@ -37,7 +37,7 @@ object NDF {
       new Writer(out, depth+1)
     }
 
-    private def emitln (text :String) {
+    private def emitln (text :String) :Unit = {
       out.print(prefix)
       out.println(text)
     }
@@ -52,7 +52,7 @@ object NDF {
     override def dump (indent :String) = println(s"$indent$key: $value")
   }
   case class DicEnt (key :String, values :Seq[Entry]) extends Entry {
-    override def dump (indent :String) {
+    override def dump (indent :String) :Unit = {
       println(s"$indent$key:")
       values foreach { _.dump(s"$indent ") }
     }

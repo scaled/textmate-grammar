@@ -7,7 +7,7 @@ package scaled.grammar
 import java.io.{File, StringReader}
 import java.util.HashMap
 import org.junit.Assert._
-import org.junit._
+import org.junit.Test
 import scaled._
 import scaled.impl.BufferImpl
 
@@ -149,10 +149,10 @@ class GrammarTest {
 
   val log = new Logger() {
     def log (msg :String) = println(msg)
-    def log (msg :String, exn :Throwable) { println(msg) ; exn.printStackTrace(System.err) }
+    def log (msg :String, exn :Throwable) :Unit = { println(msg) ; exn.printStackTrace(System.err) }
   }
 
-  @Test def testJavaDocMatch () {
+  @Test def testJavaDocMatch () :Unit = {
     val buffer = testBuffer("Test.java", testJavaCode)
     val scoper = Grammar.testScoper(Seq(javaDoc), buffer, Nil)
     scoper.rethinkBuffer()
@@ -182,7 +182,7 @@ class GrammarTest {
     (buffer, didEdit, scoper)
   }
 
-  @Test def testWordInsert () {
+  @Test def testWordInsert () :Unit = {
     val (buffer, didEdit, scoper) = smallTestBits()
     buffer.insert(Loc(3, 8), Line("blah "))
     didEdit.emit("")
@@ -191,7 +191,7 @@ class GrammarTest {
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 20)))
   }
 
-  @Test def testNewlineInsert () {
+  @Test def testNewlineInsert () :Unit = {
     val (buffer, didEdit, scoper) = smallTestBits()
     buffer.insert(Loc(3, 0), Seq(Line(""), Line("")))
     didEdit.emit("")
@@ -200,7 +200,7 @@ class GrammarTest {
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 15)))
   }
 
-  @Test def testRaggedInsert () {
+  @Test def testRaggedInsert () :Unit = {
     val (buffer, didEdit, scoper) = smallTestBits()
     buffer.insert(Loc(3, 0), Seq(Line(" "), Line(" ")))
     didEdit.emit("")
@@ -209,7 +209,7 @@ class GrammarTest {
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(4, 16)))
   }
 
-  @Test def testWordDelete () {
+  @Test def testWordDelete () :Unit = {
     val (buffer, didEdit, scoper) = smallTestBits()
     buffer.delete(Loc(3, 8), 5)
     didEdit.emit("")
@@ -218,7 +218,7 @@ class GrammarTest {
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(3, 10)))
   }
 
-  @Test def testNewlineDelete () {
+  @Test def testNewlineDelete () :Unit = {
     val (buffer, didEdit, scoper) = smallTestBits()
     buffer.delete(Loc(1, 0), Loc(2, 0))
     didEdit.emit("")
@@ -227,7 +227,7 @@ class GrammarTest {
     assertScopesEqual(literalToken, scoper.scopesAt(Loc(2, 15)))
   }
 
-  @Test def testEnclosingDelete () {
+  @Test def testEnclosingDelete () :Unit = {
     val (buffer, didEdit, scoper) = smallTestBits()
     buffer.delete(Loc(3, 13), Loc(3, 32))
     didEdit.emit("")
@@ -240,7 +240,7 @@ class GrammarTest {
     assertScopesEqual(scopes, scoper.scopesAt(Loc(3, 15)))
   }
 
-  @Test def testParse () {
+  @Test def testParse () :Unit = {
     val javaDocP = getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage")
     val javaP = getClass.getClassLoader.getResourceAsStream("Java.tmLanguage")
     val javaDoc = Grammar.parsePlist(javaDocP)
@@ -250,7 +250,7 @@ class GrammarTest {
     // println(scoper)
   }
 
-  // @Test def testPrint () {
+  // @Test def testPrint () :Unit = {
   //   val javaDoc = Grammar.parsePlist(
   //     getClass.getClassLoader.getResourceAsStream("JavaDoc.tmLanguage"))
   //   javaDoc.print(System.out)

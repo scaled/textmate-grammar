@@ -681,7 +681,7 @@ patterns:
     caps: 1=punctuation.definition.heading.markdown
 """
 
-  @Test def testRead () {
+  @Test def testRead () :Unit = {
     val vals = NDF.read(List.from(input.split("\n")))
     assertEquals(List("name", "scopeName", "foldStart", "foldStop", "repository", "patterns"),
                  vals.map(_.key))
@@ -707,7 +707,7 @@ patterns:
                       "raw", "separator", "strikethrough", "tag-kbd"), repoValKeys)
   }
 
-  @Test def testParseGrammar () {
+  @Test def testParseGrammar () :Unit = {
     val grammar = NDFGrammar.toGrammar(NDF.read(List.from(input.split("\n"))))
     grammar.print(System.out)
   }

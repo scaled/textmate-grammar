@@ -7,6 +7,7 @@ package scaled.grammar
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scaled._
+import scaled.grammar.Matcher
 
 /** Applies a grammar (and any dependent grammars) to an [[RBuffer]] to obtain an initial scoping
   * of all text in the buffer. Then also listens for modifications to the buffer and updates the
@@ -97,7 +98,7 @@ class Scoper (grammar :Grammar, matcher :Matcher, buf :Buffer, procs :List[Selec
   }
 
   // rethinks row; if end of row state changed, rethinks the next row as well; &c
-  private def cascadeRethink (row :Int, stopRow :Int, firstRow :Int, force :Boolean) {
+  private def cascadeRethink (row :Int, stopRow :Int, firstRow :Int, force :Boolean) :Unit = {
     if (row < stopRow) {
       try {
         val ostate = curState(row) ; val nstate = rethink(row, firstRow)

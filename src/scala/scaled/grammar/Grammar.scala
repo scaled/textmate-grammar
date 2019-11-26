@@ -9,6 +9,7 @@ import java.net.URL
 import java.nio.file.Path
 import java.util.HashMap
 import scaled._
+import scaled.grammar.Matcher
 
 /** Contains the data for a TextMate language grammar. Certain elements are omitted as they do not
   * map directly to the way Scaled handles languages. Generally one would create a language mode in
@@ -27,7 +28,7 @@ abstract class Grammar (
   override def toString = s"Grammar[$name, $scopeName]"
 
   /** Prints a debug representation of this grammar to `out`. */
-  def print (out :PrintStream) {
+  def print (out :PrintStream) :Unit = {
     val w = new NDF.Writer(out, 0)
     w.emit("name", name)
     w.emit("scopeName", scopeName)
@@ -124,7 +125,7 @@ object Grammar {
     val byScope = new HashMap[String, Grammar.Compiler]()
     val log = new Logger() {
       def log (msg :String) = println(msg)
-      def log (msg :String, exn :Throwable) { println(msg) ; exn.printStackTrace(System.err) }
+      def log (msg :String, exn :Throwable) :Unit = { println(msg) ; exn.printStackTrace(System.err) }
     }
     val comps = grammars.map(g => new Grammar.Compiler(g, log, byScope.get))
     comps.foreach { c => byScope.put(c.grammar.scopeName, c) }

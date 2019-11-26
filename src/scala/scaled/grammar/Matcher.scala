@@ -54,7 +54,7 @@ object Matcher {
     def continue (line :LineV) :State = new State(matchers, scopes).process(line)
 
     /** Applies `procs` to the spans matched on this line. */
-    def apply (procs :List[Selector.Processor], buf :Buffer, row :Int) {
+    def apply (procs :List[Selector.Processor], buf :Buffer, row :Int) :Unit = {
       val sp = spans ; val ll = sp.length
       var pp = procs ; while (!pp.isEmpty) {
         val proc = pp.head ; proc.onBeforeLine(buf, row)
@@ -84,7 +84,7 @@ object Matcher {
 
     private[this] var lastPos = 0
 
-    def onMatch (didAdvance :Boolean) {
+    def onMatch (didAdvance :Boolean) :Unit = {
       // if we advanced the scan position, clear the skipped matchers set
       if (didAdvance && !skips.isEmpty) skips = SSet()
     }

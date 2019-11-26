@@ -6,6 +6,7 @@ package scaled.grammar
 
 import java.util.HashMap
 import scaled._
+import scaled.grammar.Matcher
 
 class GrammarManager (
   msvc :MetaService, psvc :PluginService
@@ -29,8 +30,8 @@ class GrammarManager (
       case plugin => new Grammar.Compiler(plugin.grammar(scope), msvc.log, compiler)
     })
 
-  override def didStartup () {}
-  override def willShutdown () {}
+  override def didStartup () :Unit = {}
+  override def willShutdown () :Unit = {}
 
   override def grammar (langScope :String) :Option[Grammar] =
     Option(compiler(langScope)).map(_.grammar)
